@@ -68,17 +68,6 @@ import {
 export async function GET() {
   try {
     const owner = await userId();
-    if (!(await setting(owner, "initialized"))) {
-      await change(
-        "INSERT INTO tracks (id,owner,kind,query,label) VALUES (?,?,?,?,?)",
-        id(),
-        owner,
-        "wallet",
-        TRACKED_WALLET,
-        "Tracked developer",
-      );
-      await setSetting(owner, "initialized", true);
-    }
     // Only stale run locks are recovered; spending reservations are never reset.
     await change(
       "UPDATE agents SET status='ready' WHERE owner=? AND status IN ('running','stopping') AND updated_at<?",
@@ -142,6 +131,12 @@ export async function GET() {
           owner,
         ),
         sessionImage: await setting(owner, "session_image"),
+        deployStudy: await setting(owner, "deploy_study"),
+        feeReceipts: (await rows("SELECT value FROM settings WHERE owner=? AND key LIKE 'fee_receipt_%'", owner)).map(r => JSON.parse(r.value)),
+        walletReadiness: Object.fromEntries((await rows(
+          "SELECT key,value FROM settings WHERE owner=? AND key LIKE 'wallet_readiness_%'", owner,
+        )).map((r) => [r.key.slice("wallet_readiness_".length), JSON.parse(r.value)])),
+
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );
@@ -328,6 +323,26 @@ export async function POST(request: Request) {
         );
         break;
       }
+      case "create_agent_wallet": {
+        const { createAgentWallet } = await import("../../server/agent-wallet");
+        result = await createAgentWallet(owner, b);
+        break;
+      }
+      case "check_session": {
+        const { sessionReadiness } = await import("../../server/agent-wallet");
+        result = await sessionReadiness(owner, textValue(b.agentId, 100));
+        break;
+      }
+      case "study_deploys": {
+        const { studyDeploys } = await import("../../server/deploy-study");
+        result = await studyDeploys(owner);
+        break;
+      }
+      case "configure_agent_wallet": {
+        const { configureAgentWallet } = await import("../../server/agent-wallet");
+        result = await configureAgentWallet(owner, textValue(b.agentId, 100), b);
+        break;
+      }
       case "create_agent": {
         const name = textValue(b.name, 60),
           mission = textValue(b.mission, 3000, 12),
@@ -466,18 +481,17 @@ export async function POST(request: Request) {
       case "refresh_wallets":
         result = await refreshWallets(owner);
         break;
-      case "cancel_run":
+      case "cancel_run": {
         await change(
           "UPDATE agents SET status='stopping' WHERE id=? AND owner=? AND status='running'",
           b.agentId,
           owner,
         );
-        await change(
-          "UPDATE sessions SET enabled=0 WHERE agent_id=? AND owner=?",
-          b.agentId,
-          owner,
-        );
+        const { toggleAgentWallet } = await import("../../server/agent-wallet");
+        if (await one("SELECT agent_id FROM sessions WHERE agent_id=? AND owner=?", b.agentId, owner))
+          await toggleAgentWallet(owner, b.agentId, false);
         break;
+      }
       case "edit_draft": {
         const d = await one(
           "SELECT * FROM drafts WHERE id=? AND owner=?",
@@ -551,35 +565,8 @@ export async function POST(request: Request) {
         result = await createSession(owner, b.agentId, b);
         break;
       case "toggle_session": {
-        if (typeof b.enabled !== "boolean")
-          throw new AppError("Choose on or off.");
-        const s = await one(
-          "SELECT * FROM sessions WHERE agent_id=? AND owner=?",
-          b.agentId,
-          owner,
-        );
-        if (!s) throw new AppError("Create a launch wallet first.");
-        if (
-          b.enabled &&
-          (s.expires_at < now() ||
-            s.used_launches >= s.max_launches ||
-            s.used_lamports >= s.max_lamports)
-        )
-          throw new AppError("Session expired or its budget is exhausted.");
-        await change(
-          "UPDATE sessions SET enabled=? WHERE agent_id=? AND owner=?",
-          b.enabled ? 1 : 0,
-          b.agentId,
-          owner,
-        );
-        await event(
-          owner,
-          b.agentId,
-          "session",
-          b.enabled
-            ? "Instant mode enabled within the approved session caps."
-            : "Instant mode stopped.",
-        );
+        const { toggleAgentWallet } = await import("../../server/agent-wallet");
+        result = await toggleAgentWallet(owner, textValue(b.agentId, 100), b.enabled);
         break;
       }
       case "withdraw_session":

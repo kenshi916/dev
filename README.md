@@ -1,6 +1,6 @@
 # Dev
 
-Dev is an experimental pump.fun launch workspace with a tweet feed beside a compact token-deploy panel, an OpenRouter model catalog, tracked developer wallets, and capped instant-launch sessions. The Overview view follows Sweep's typography and layout.
+Dev is an experimental agent-centered pump.fun launch workspace. Choose an OpenRouter model, give it a mission, create its dedicated Solana wallet, fund it, and explicitly activate a capped launch session. The launch terminal retains a shared public signal feed; separate tweet and wallet tracker pages have been removed. The Overview view follows Sweep's typography and layout.
 
 ## Run locally
 
@@ -16,9 +16,9 @@ npm run dev -- --hostname 127.0.0.1
 
 Apply the migration only to a new local database. Open the URL printed by the server. Local Sign in uses the starter's development-only identity; hosted Sites use ChatGPT sign-in with server-side per-user ownership.
 
-## Connections
+## Operator services
 
-Use **Use my API key** in the terminal. OpenRouter supports its account authorization flow or your existing API key. Keys are encrypted server-side, never sent to an AI prompt, and never saved in browser storage.
+Connections and AI funding are absent from the public navigation. Existing server-side credential and fee-management routes remain for operator integration; this is not a complete public administration interface. OpenRouter supports account authorization or a saved personal key. Keys are encrypted server-side, never sent to an AI prompt, and never saved in browser storage. New workspaces still require service configuration before activation.
 
 - **OpenRouter:** generation credits and a model with tool support.
 - **X:** an app-only bearer token from the X Developer Console, recent-search access, and prepaid X API credits. The token is marked saved until a successful refresh verifies access. The tracker uses owner-scoped `since_id` checkpoints and paginates a bounded batch of ten posts per due tracker; it preserves unfinished pages, isolates failed queries, and respects provider retry windows. Auto-refresh is opt-in every two minutes while the terminal/tracker is visible. This is polling, not a persistent stream.
@@ -26,37 +26,41 @@ Use **Use my API key** in the terminal. OpenRouter supports its account authoriz
 - **Pinata:** JWT for publishing coin artwork and metadata to public IPFS.
 - **Solana RPC:** HTTPS mainnet RPC for preparing, simulating, and confirming launches. For capped launches, the node must return simulation preBalances and postBalances. Public wallet scans fall back to the official public RPC, which can rate-limit or reject requests.
 
-The selected developer wallet is **bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa**. It is a tracked source only, never a fee recipient. Identity and performance are not inferred from the address.
+## Create and activate an agent
 
-Wallet scans examine the latest twelve transactions and store recognized Pump/PumpSwap buys and sells, launches, token changes, and source transaction links. Matched buy/sell results require complete observed token-account round trips; transfers, missing transactions, and ambiguous multi-swap activity are excluded. The display reports sampled SOL cash flow and holding time, not lifetime profit or proof of a wallet owner's motivation. **Create a dev from this wallet** prepares a research mission grounded in those observations.
+1. Open **Agents → Create agent** and choose a model and mission.
+2. Click **Create agent & wallet**. Dev automatically creates an encrypted dedicated wallet; retries reuse the same wallet. No pre-existing wallet or deposit is needed to create it.
+3. Copy its deposit address and send SOL from your own wallet. A deposit funds launches, not OpenRouter credits.
+4. Set its launch allowance, per-launch cap, maximum launches and the withdrawal address for unused SOL. Upload default coin artwork, configure RPC/Pinata and model access, and check balance and readiness.
+5. Approve **Activate agent**. The 24-hour window begins on first activation; pausing never extends it or resets spending. **Retire & return remaining SOL** revokes authorization and submits a return to the fixed address.
+
+Model access may use a personal OpenRouter key or operator-configured sponsored access. Creation itself does not fund a wallet, buy credits, or activate launches. Existing research profiles without wallets can finish setup from **Wallet & launch**. The reference wallet bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa is studied in the background before each run. The scanner verifies Pump creation instructions and reads a bounded recent sample; the model receives naming, theme and cadence observations. Unknown-age transactions remain historical context and cannot trigger a new launch. There is no standalone wallet tracker page.
 
 ## Launch behavior
 
 The application builds official pump.fun create_v2 instructions through @pump-fun/pump-sdk. This on-chain route needs no separate Pump API key. It does not buy tokens on creation. Normal launches require the connected injected Phantom wallet to sign. Network fees and account rent are simulated first. A submitted transaction is shown separately from a confirmed coin.
 
-Instant mode uses a dedicated, server-controlled encrypted wallet. The user creates, funds, and explicitly enables a session with a 24-hour expiry, total SOL cap, per-launch cap, and maximum launch count. The main wallet's private key is never requested. A stop button disables further launches, and remaining SOL can be returned only to the fixed recipient chosen when the session was created. Reserved budget is not automatically refunded after ambiguous submissions.
+Instant mode uses a dedicated, server-controlled encrypted wallet. Each agent has its own disabled wallet at creation. Activation verifies configured model access, RPC, Pinata, artwork, confirmed SOL, remaining allowance and authorization; it starts a 24-hour expiry with a total SOL cap, per-launch cap and maximum launch count. The main wallet's private key is never requested. A stop button disables further launches, and remaining SOL can be returned only to the fixed recipient saved before activation. Reserved budget is not automatically refunded after ambiguous submissions.
 
-While Dev is open, enabled sessions refresh sources and run every two minutes. It is not a 24/7 hosted worker or a subsecond launch guarantee. No wallet is funded or session enabled by this project.
+While Dev is open, eligible sessions rotate fairly through a two-minute decision loop and refresh the shared tweet sources. It is not a 24/7 hosted worker or a subsecond launch guarantee. No wallet is funded or session enabled by this project.
+
+Runs require an active wallet and unused public tweets or verified reference-wallet deploys with known transaction times from the last six hours. Empty, stale and repeated evidence skips the model call. Models can explicitly skip weak concepts. Proposals must cite supplied fresh signal IDs, cannot reuse a name or ticker already in the owner’s workspace, and consume their evidence atomically with the saved draft. This is not an exhaustive global originality check.
 
 The execution log shows real tool actions and concise decision summaries. It does not request or expose private chain-of-thought.
 
-## Dev thesis room
+## Signal feed and launch thesis
 
-The Overview homepage includes an animated critique of opaque, repetitive launches after the three-step introduction. It pauses outside the viewport, offers pause/manual controls, and respects reduced-motion preferences. Both supplied wallet screenshots are displayed unchanged and uncropped, with full-size links: bwa reports +$21.9M and kreo reports +$2.93M. These are dated-unknown supplied snapshots, not verified live performance. The general market critique does not assert misconduct by the pictured wallets; kreo's incomplete address is not used for tracking.
+The launch terminal has three columns: a Dev thesis sidebar, the main Twitter signal feed in the center, and the token deployment panel on the right. Dev thesis shows agents' public launch notes with their confirmed coins and source tweet excerpts/links. It only uses source snapshots saved with proposals and verified launches; there is no simulated developer conversation. Source tweets also show a launched-coin link in the owner's feed once confirmed. Older experimental discussion endpoints remain for compatibility, but the brainstorming form is no longer in the terminal.
 
-The terminal now includes provider logos sourced from OpenRouter's public catalog and provider pages. Exact image provenance is in `public/model-icons/sources.json`; unsupported provider images use the OpenRouter mark. The selected model, model cards, and dev avatars share those images.
+Activity is a public feed of newly created agents and verified coin launches. New creation forms disclose the public name, model, wallet, launch and thesis fields. Legacy private profiles are not retroactively published. Missions, owner IDs, keys and execution logs are excluded. Public launch verification uses the operator-controlled DEV_PUBLIC_SOLANA_RPC or Solana's public mainnet endpoint, never an owner's configurable endpoint. Unavailable confirmation remains pending. While the app is open, submitted launches are rechecked every 30 seconds in bounded batches.
 
-Enter a narrative, ticker, or mint in **Dev thesis**. Choose one model for three AI perspectives, or select up to three of your saved devs. Each round performs three bounded OpenRouter calls and streams completed public contributions from an analyst, critic, and editor. Saved dev missions influence their creative preferences. The initial conversation is clearly marked as an illustrative preview until a real round runs.
+The application serves `/skill.md`, a native Dev workflow reference inspired by Familiars. It documents real tools and authority limits; external-agent bearer registration is not implemented.
 
-The room reads up to 12 saved tweet/wallet signals and a fresh, bounded DexScreener search sample. It does not refresh X or wallet trackers itself; source timestamps and search coverage are shown. The roles compare other coins, challenge a competing narrative (a “vamp” angle), and propose a differentiated concept. A second search checks the candidate name against up to eight returned pairs. “Not found in the searched sample” never means proven original or unused.
+Provider logos come from OpenRouter's catalog and provider pages; provenance is in `public/model-icons/sources.json`. The supplied bwam wordmark is green in the header/footer. The homepage retains supplied wallet screenshots as historical reference images, not live verified PNL.
 
-Pairing recommendations describe a narrative/community fit, not an endorsement, partnership, or additional market. The executable launch quote remains SOL. **Send to launch terminal** imports an idempotent draft with its thesis and source links; it never calls the automatic launch route. A new round can continue the latest completed discussion with fresh market data. The latest complete round is saved per owner; interrupted replies remain visible during the current visit and do not replace the saved completed round.
+## AI funding from launched coins
 
-An OpenRouter connection is required to generate real discussions. Each round is limited to three replies of at most 1,200 output tokens each, with request timeouts and per-owner concurrency/throttle controls. Model choice determines credit use. No paid model request or on-chain action is made by the automated checks.
-
-## Main coin support
-
-A main mint and treasury are intentionally unset. A main mint is optional for operating-budget support. Users can configure a proposed share of each created coin's creator fees, then separately review and confirm a permanent on-chain fee-sharing setup after that coin is confirmed. The setup cannot be silently changed. This is a share of creator fees, not a share of all trading volume. No automatic buyback, burn, token gate, or return guarantee is implemented.
+A main mint and treasury are intentionally unset. A main mint is optional for operating-budget support. The retained operator integration can configure a proposed share of each created coin's creator fees, then separately review and confirm a permanent on-chain fee-sharing setup after that coin is confirmed. The setup cannot be silently changed. This is a share of creator fees, not a share of all trading volume. No automatic buyback, burn, token gate, or return guarantee is implemented.
 
 The fee setup is a separate transaction because a basic combined create-plus-fee-setup transaction exceeds the standard transaction size without an address lookup table. Graduated coins may require setup through pump.fun. A fee setup is active only after on-chain confirmation.
 
@@ -67,6 +71,8 @@ Confirmed SOL fee splits have a **Preview fee distribution** flow. It verifies o
 Personal OpenRouter connections continue to pay from the user's account. Optional Dev-sponsored access uses a server-only OpenRouter **Management API key** to provision one encrypted, provider-capped inference key per approved authenticated owner. Management keys cannot run inference themselves. Configure `DEV_SPONSORED_AI_ENABLED`, `OPENROUTER_MANAGEMENT_KEY`, `DEV_SPONSORED_AI_OWNERS`, and `DEV_SPONSORED_AI_DAILY_USD` as documented in `.env.example`. No public auto-enrollment or unlimited fallback is enabled. A personal key takes precedence; a broken personal key never silently spends platform credits.
 
 Daily child-key caps reset at midnight UTC. They bound the approved allowance, not a funded balance. The platform OpenRouter account needs credits before inference can run. Uncertain provisioning is durably blocked to prevent duplicate keys and budgets; an operator must reconcile the named attempt with OpenRouter before resetting it. Do not use the normal personal connection field for a management key.
+
+The backend stores append-only confirmed treasury receipts separately from model-payment configuration. The AI funding page has been removed from navigation. Receipt retries are idempotent and do not create model credits.
 
 The intended funding flow is creator-fee distribution → treasury → operating budget → OpenRouter credit purchase → model usage. The current OpenRouter crypto-credit API has been removed; replenishment uses its supported credits checkout, separately from Solana fee distribution. No automatic conversion or credit purchase is implemented. Startup credit and network-fee funding is still required before fee revenue exists.
 
@@ -82,7 +88,7 @@ To publish with Sites, register the project once, preserve its D1 binding, set C
 - Local API checks for authentication, forged identity, cross-origin writes, persistence, bad wallet input, bad fee percentages, and missing-key handling.
 - Offline official-SDK create transaction inspection; no RPC or broadcasts.
 - Spending-cap arithmetic fails closed when simulation data is unavailable.
-- Live OpenRouter catalog verified (375 tool-capable models at build time).
+- Live OpenRouter catalog loads the current tool-capable models.
 - Fifteen isolated thesis regression tests cover scoped evidence, continuations, concurrent leases, streamed failures, Unicode name matching, and idempotent draft import. Model HTTP replies are fixtures; these tests do not spend credits.
 - OpenRouter OAuth and one bounded live GPT-4.1 Nano inference call were verified during development.
 - A live TwitterAPI.io search fetched 20 posts; a live research run read saved tweets and created a draft proposal. No token was deployed by that check.
@@ -92,7 +98,7 @@ To publish with Sites, register the project once, preserve its D1 binding, set C
 
 ```powershell
 npx tsc --noEmit
-node --test scripts/limits.test.mjs
+node --test scripts/limits.test.mjs scripts/agent-wallet.test.mjs
 node scripts/transaction-check.mjs
 node --test scripts/thesis-import.test.mjs scripts/thesis-regression.test.mjs
 node --test scripts/ai-access.test.mjs scripts/ai-check.test.mjs scripts/twitter-tracker.test.mjs

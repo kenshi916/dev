@@ -11,12 +11,14 @@ import { simulatedDebit } from "./limits";
 import {
   AppError,
   change,
+  db,
   decrypt,
   encrypt,
   event,
   id,
   now,
   one,
+  publicLaunchTransaction,
   rows,
   rpc,
   setting,
@@ -196,7 +198,8 @@ export async function confirmLaunch(owner: string, draftId: string) {
     owner,
   );
   if (!d?.signature) throw new AppError("No submitted transaction to confirm.");
-  const tx = await rpc(owner, "getTransaction", [
+  const isPublic = (await setting(owner, "public_agent_" + d.agent_id))?.visible === true;
+  const tx = isPublic ? await publicLaunchTransaction(d.signature) : await rpc(owner, "getTransaction", [
     d.signature,
     {
       encoding: "jsonParsed",
@@ -213,6 +216,7 @@ export async function confirmLaunch(owner: string, draftId: string) {
     );
     return { status: "failed" };
   }
+  if (tx.meta?.err !== null) throw new AppError("Transaction execution could not be verified.");
   const prepared = JSON.parse(d.prepared || "{}");
   const ix = tx.transaction?.message?.instructions?.find(
     (i: any) =>
@@ -231,12 +235,13 @@ export async function confirmLaunch(owner: string, draftId: string) {
     throw new AppError(
       "This transaction does not match the prepared coin launch.",
     );
+  const confirmedAt = Number.isFinite(tx.blockTime) ? new Date(tx.blockTime * 1000).toISOString() : now();
+  await db().batch([
+    db().prepare("UPDATE drafts SET status='launched' WHERE id=? AND owner=?").bind(draftId, owner),
+    db().prepare("INSERT INTO settings(owner,key,value) VALUES (?,?,?) ON CONFLICT(owner,key) DO NOTHING")
+      .bind(owner, "public_launch_" + draftId, JSON.stringify({ confirmedAt })),
+  ]);
   if (d.status !== "launched") {
-    await change(
-      "UPDATE drafts SET status='launched' WHERE id=? AND owner=?",
-      draftId,
-      owner,
-    );
     await event(
       owner,
       d.agent_id,
@@ -259,47 +264,11 @@ export async function createSession(
     throw new AppError(
       "A launch wallet already exists for this dev. Reuse it and its fixed budget.",
     );
-  const max = Number(input.maxSol),
-    per = Number(input.perLaunch),
-    count = Number(input.maxLaunches);
-  if (
-    !Number.isFinite(max) ||
-    max < 0.001 ||
-    max > 1 ||
-    !Number.isFinite(per) ||
-    per < 0.001 ||
-    per > max ||
-    !Number.isInteger(count) ||
-    count < 1 ||
-    count > 10
-  )
-    throw new AppError(
-      "Use a total budget up to 1 SOL, a per-launch cap within that budget, and 1–10 launches.",
-    );
-  const recipient = pubkey(input.recipient).toBase58();
-  const kp = Keypair.generate();
-  const art = await setting(owner, "session_image");
-  if (!art) throw new AppError("Upload default coin artwork first.");
-  await change(
-    "INSERT INTO sessions (owner,agent_id,public_key,private_key,max_lamports,per_launch,max_launches,expires_at,image_url,recipient) VALUES (?,?,?,?,?,?,?,?,?,?)",
-    owner,
-    agentId,
-    kp.publicKey.toBase58(),
-    await encrypt(encode(kp.secretKey), owner + ":session:" + agentId),
-    Math.floor(max * 1e9),
-    Math.floor(per * 1e9),
-    count,
-    new Date(Date.now() + 86400000).toISOString(),
-    art,
-    recipient,
-  );
-  await event(
-    owner,
-    agentId,
-    "session",
-    "Created a dedicated launch wallet. Instant mode is off until explicitly enabled.",
-  );
-  return { publicKey: kp.publicKey.toBase58() };
+  const { walletInsert } = await import("./agent-wallet");
+  const wallet = await walletInsert(owner, agentId, input);
+  await wallet.statement.run();
+  await event(owner, agentId, "session", "Dedicated wallet created. Fund and activate it to authorize launches.");
+  return { publicKey: wallet.publicKey };
 }
 export async function autoLaunch(owner: string, draftId: string) {
   const draft = await one(
@@ -399,8 +368,11 @@ export async function withdrawSession(owner: string, agentId: string) {
     owner,
   );
   if (!s) throw new AppError("Launch wallet not found.");
+  if (!s.recipient) throw new AppError("Save a return address before retiring this wallet.");
+  const recipient = pubkey(s.recipient);
   await change(
-    "UPDATE sessions SET enabled=0 WHERE agent_id=? AND owner=?",
+    "UPDATE sessions SET enabled=0,expires_at=? WHERE agent_id=? AND owner=?",
+    now(),
     agentId,
     owner,
   );
@@ -432,7 +404,7 @@ export async function withdrawSession(owner: string, agentId: string) {
       instructions: [
         SystemProgram.transfer({
           fromPubkey: kp.publicKey,
-          toPubkey: pubkey(s.recipient),
+          toPubkey: recipient,
           lamports,
         }),
       ],

@@ -44,8 +44,10 @@ function launchInTransaction(value: unknown, wallet: string) {
   return null;
 }
 
-export async function refreshWallets(owner: string) {
-  const tracks = await rows("SELECT * FROM tracks WHERE owner=? AND kind='wallet'", owner);
+export async function refreshWallets(owner: string, onlyWallet?: string) {
+  const tracks = onlyWallet
+    ? await rows("SELECT * FROM tracks WHERE owner=? AND kind='wallet' AND query=?", owner, onlyWallet)
+    : await rows("SELECT * FROM tracks WHERE owner=? AND kind='wallet'", owner);
   if (!tracks.length) throw new AppError("Add a developer wallet first.");
   let examined = 0, launches = 0, trades = 0, balanceChanges = 0, matchedRoundTrips = 0, unavailableTransactions = 0;
   for (const track of tracks) {

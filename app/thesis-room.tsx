@@ -344,14 +344,7 @@ export default function ThesisRoom(p: Props) {
             : "uses your OpenRouter credits."}
         </div>
         {!p.connected && (
-          <button
-            type="button"
-            className="thesis-connect"
-            onClick={p.connections}
-          >
-            <Link2 size={12} /> Connect OpenRouter to start a real discussion{" "}
-            <ArrowUpRight size={12} />
-          </button>
+          <p className="thesis-connect">Model access is being set up for this workspace.</p>
         )}
       </form>
       <div className="thesis-conversation" aria-live="polite">

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import ModelAvatar from "./model-avatar";
 import TwitterStatus, { twitterLabel } from "./twitter-status";
-import ThesisRoom, { type Discussion } from "./thesis-room";
+import LaunchThesisBar from "./launch-thesis-bar";
 import {
   Cpu,
   Search,
@@ -55,11 +55,10 @@ export default function DeployStudio(p: Props) {
     [imageUrl, setImageUrl] = useState(""),
     [preview, setPreview] = useState(""),
     [goal, setGoal] = useState(
-      "Learn from my tracked developer wallets and tweets. Create one original meme coin idea with a distinct name, ticker, and short description.",
+      "Review fresh public signals, skip repetitive ideas, and propose a distinct community coin with a clear thesis.",
     ),
     [agentId, setAgentId] = useState(""),
     [selectedDraft, setSelectedDraft] = useState(""),
-    [thesisContext, setThesisContext] = useState(""),
     [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null),
     seenDraft = useRef("");
@@ -127,17 +126,10 @@ export default function DeployStudio(p: Props) {
       p.connections();
       return;
     }
-    const a = await p.act("create_agent", {
-      name: "Launch dev " + (p.data.agents.length + 1),
-      mission: missionOverride || goal,
-      model: p.model,
-    });
-    if (a) {
-      setThesisContext("");
-      setAgentId(a.id);
-      await p.run(a.id);
-    }
+    p.view("My devs");
+    p.setError("Create and activate an agent with its own wallet in Agents, then run its decisions there.");
   }
+
   async function save(review = false) {
     if (!p.user) {
       location.href = "/signin-with-chatgpt?return_to=/";
@@ -176,30 +168,6 @@ export default function DeployStudio(p: Props) {
       setSaving(false);
     }
   }
-  async function importThesis(discussion: Discussion) {
-    const draft = await p.act(
-      "import_thesis",
-      { discussionId: discussion.id },
-      "Thesis loaded in the launch terminal.",
-    );
-    if (!draft) return false;
-    setAgentId("");
-    setSelectedDraft(draft.id);
-    setName(draft.name);
-    setSymbol(draft.symbol);
-    setDescription(draft.description);
-    setImageUrl(draft.image_url || "");
-    setFile(null);
-    setWebsite("");
-    setTwitter("");
-    if (discussion.models.at(-1)) p.setModel(discussion.models.at(-1)!);
-    setThesisContext(
-      discussion.proposal.pairing.candidate +
-        " · " +
-        discussion.proposal.pairing.reason,
-    );
-    return true;
-  }
   return (
     <section className="studio">
       <div className="studio-title">
@@ -228,14 +196,7 @@ export default function DeployStudio(p: Props) {
           <Search size={13} />
           Browse {p.models.length} models
         </button>
-        <button onClick={p.connections}>
-          <Link2 size={13} />
-          {p.data.connections.openrouter
-            ? "OpenRouter connected"
-            : p.data.aiAccess?.available
-              ? "Dev-funded AI"
-              : "Use my API key"}
-        </button>
+        <span className="badge">{p.data.aiAccess?.available || p.data.connections.openrouter ? "AI AVAILABLE" : "AI SETUP PENDING"}</span>
       </div>
       <div className="featured-models" aria-label="Featured OpenRouter models">
         {featuredModels.map((m) => (
@@ -271,14 +232,6 @@ export default function DeployStudio(p: Props) {
                 <h2>Choose your OpenRouter model</h2>
                 <p>Live model catalog · tool-capable models</p>
               </div>
-              <button className="button small" onClick={p.connections}>
-                <Link2 size={13} />
-                {p.data.connections.openrouter
-                  ? "Connected"
-                  : p.data.aiAccess?.available
-                    ? "Dev-funded AI"
-                    : "Use my API key"}
-              </button>
             </div>
             <label className="model-search">
               <Search size={15} />
@@ -346,24 +299,13 @@ export default function DeployStudio(p: Props) {
         </div>
       )}
       <div className="studio-grid">
-        <div className="intelligence">
-          <ThesisRoom
-            user={p.user}
-            model={p.model}
-            models={p.models}
-            agents={p.data.agents}
-            connected={
-              !!p.data.connections.openrouter || !!p.data.aiAccess?.available
-            }
-            funding={p.data.aiAccess?.source}
-            connections={p.connections}
-            onSend={importThesis}
-          />
+        <LaunchThesisBar />
+        <div className="intelligence signal-column">
           <section className="terminal-card terminal-feed">
             <div className="terminal-head">
               <b>
                 <Radio size={14} />
-                Tweet tracker
+                Signal feed
               </b>
               <div className="row">
                 <span className="badge">
@@ -407,9 +349,6 @@ export default function DeployStudio(p: Props) {
               <button disabled={!p.user || !!p.busy}>
                 <Plus size={13} />
                 Track
-              </button>
-              <button type="button" onClick={p.connections}>
-                <Settings2 size={13} />
               </button>
             </form>
             <TwitterStatus status={p.data.twitterStatus} />
@@ -459,6 +398,7 @@ export default function DeployStudio(p: Props) {
                       <div className="tweet-meta">
                         {t.likes} likes · Saved signal
                       </div>
+                      {p.data.drafts.filter((d: any) => d.status === "launched" && d.mint && d.rationale?.includes(t.url)).map((d: any) => <a className="tweet-launched" key={d.id} href={"https://pump.fun/coin/" + d.mint} target="_blank" rel="noreferrer"><Rocket size={12} />{p.data.agents.find((a: any) => a.id === d.agent_id)?.name || "Dev"} launched ${d.symbol}<ExternalLink size={11} /></a>)}
                     </div>
                     <button
                       className="tweet-deploy"
@@ -493,42 +433,19 @@ export default function DeployStudio(p: Props) {
                     >
                       Sign in to add trackers
                     </a>
-                  ) : (
-                    <button className="button" onClick={p.connections}>
-                      {(p.data.twitterStatus?.connected ?? p.data.connections.x) ? "Manage tweet access" : "Connect tweet API"}
-                    </button>
-                  )}
+                  ) : null}
                   <small>
                     {(p.data.twitterStatus?.connected ?? p.data.connections.x)
                       ? "Your token is saved. Posts appear after a successful refresh."
-                      : "Connect a tweet provider and refresh to load real posts."}
+                      : "The operator needs to configure the signal provider."}
                   </small>
                 </div>
               )}
             </div>
           </section>
           <div className="signal-shortcuts">
-            <button onClick={() => p.view("Wallet tracker")}>
-              <Eye size={18} />
-              <div>
-                <b>Developer wallets</b>
-                <span>
-                  {p.data.wallets?.length || 0} tracked · learn from public
-                  launches and trades
-                </span>
-              </div>
-              <Plus size={14} />
-            </button>
-            <button onClick={() => p.view("Tweet tracker")}>
-              <Radio size={18} />
-              <div>
-                <b>Tweet tracker</b>
-                <span>
-                  {p.data.tweets.length} saved signals · feed your dev
-                </span>
-              </div>
-              <Plus size={14} />
-            </button>
+            <button onClick={() => p.view("My devs")}><Wallet size={18} /><div><b>Your agents</b><span>Dedicated wallets, launch limits and activation</span></div></button>
+            <button onClick={() => p.view("Activity")}><Activity size={18} /><div><b>Network activity</b><span>New agents and confirmed coin launches</span></div></button>
           </div>
           <div className="terminal-card">
             <div className="terminal-head">
@@ -563,13 +480,6 @@ export default function DeployStudio(p: Props) {
         <aside className="deploy-panel">
           <div className="deploy-top">
             <b>Token Deploy</b>
-            <button
-              title="Connections"
-              aria-label="Connections"
-              onClick={p.connections}
-            >
-              <Settings2 size={12} />
-            </button>
             <span className="spacer" />
             <button
               title="Save proposal"
@@ -635,7 +545,6 @@ export default function DeployStudio(p: Props) {
                   setSelectedDraft("");
                   setFile(null);
                   setImageUrl("");
-                  setThesisContext("");
                 }}
               >
                 Clear
@@ -736,17 +645,13 @@ export default function DeployStudio(p: Props) {
                 <Upload size={14} />
               </button>
               <button
-                title="Watch developer wallets"
-                aria-label="Watch developer wallets"
-                onClick={() => p.view("Wallet tracker")}
+                title="Manage agent wallets"
+                aria-label="Manage agent wallets"
+                onClick={() => p.view("My devs")}
               >
                 <Eye size={14} />
               </button>
               <span className="spacer" />
-              <button onClick={p.connections}>
-                <Link2 size={13} />
-                API key
-              </button>
             </div>
             <div className="deploy-platform">
               <button className="chosen">
@@ -755,25 +660,17 @@ export default function DeployStudio(p: Props) {
               <div>SOLANA MAINNET</div>
             </div>
             <div className="deploy-toggles">
-              <button onClick={() => p.view("Main coin")}>
-                ⑂ Fee Split{" "}
-                <span className="tiny">
-                  {p.data.support?.treasury
-                    ? p.data.support.percentage + "%"
-                    : "OFF"}
-                </span>
-              </button>
               <button onClick={() => p.view("My devs")}>
                 <Zap size={13} />
-                Instant mode
+                Agents
               </button>
-              <button onClick={() => p.view("Wallet tracker")}>
+              <button onClick={() => p.view("My devs")}>
                 <Eye size={13} />
-                Wallet signals
+                Agent wallets
               </button>
-              <button onClick={() => p.view("Tweet tracker")}>
+              <button onClick={() => p.view("Activity")}>
                 <Radio size={13} />
-                Tweet signals
+                Agent activity
               </button>
             </div>
             <div className="launch-details">
@@ -784,15 +681,7 @@ export default function DeployStudio(p: Props) {
               <span>Network fee + account rent</span>
               <b>Calculated before signing</b>
             </div>
-            {thesisContext && (
-              <div className="deploy-thesis-context">
-                <b>Narrative pairing</b>
-                <p>{thesisContext}</p>
-                <small>
-                  Research suggestion · no additional trading pair created.
-                </small>
-              </div>
-            )}
+
             <button
               className="deploy-submit"
               disabled={

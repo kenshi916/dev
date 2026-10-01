@@ -495,7 +495,16 @@ export async function confirmFeeDistribution(owner: string, draftId: string, sig
     throw new AppError("Prepare a fee collection for this coin first.", 404);
   if (prepared.signature && prepared.signature !== signature)
     throw new AppError("This collection is associated with a different transaction.", 409);
-  if (prepared.status === "confirmed" || prepared.status === "failed") return prepared;
+  const recordReceipt = async (record: PreparedFeeDistribution) => {
+    if (record.status !== "confirmed") return;
+    await change("INSERT INTO settings (owner,key,value) VALUES (?,?,?) ON CONFLICT(owner,key) DO NOTHING", owner,
+      "fee_receipt_" + signature, JSON.stringify({ signature, draftId, agentId: draft.agent_id,
+        treasury: record.treasury, receivedLamports: record.receivedLamports, confirmedAt: record.confirmedAt }));
+  };
+  if (prepared.status === "confirmed" || prepared.status === "failed") {
+    await recordReceipt(prepared);
+    return prepared;
+  }
   const observed = await rpc(owner, "getTransaction", [signature, {
     encoding: "base64", maxSupportedTransactionVersion: 0, commitment: "confirmed",
   }]);
@@ -558,9 +567,13 @@ export async function confirmFeeDistribution(owner: string, draftId: string, sig
   const updated = await change("UPDATE settings SET value=? WHERE owner=? AND key=? AND value=?", JSON.stringify(completed), owner, key, JSON.stringify(prepared));
   if (updated.meta.changes !== 1) {
     const current: PreparedFeeDistribution | null = await setting(owner, key);
-    if (current?.signature === signature && ["confirmed", "failed"].includes(current.status)) return current;
+    if (current?.signature === signature && ["confirmed", "failed"].includes(current.status)) {
+      await recordReceipt(current);
+      return current;
+    }
     throw new AppError("Fee collection state changed. Reload before checking confirmation again.", 409);
   }
+  await recordReceipt(completed);
   await event(owner, draft.agent_id, "fees", completed.status === "confirmed"
     ? "Creator-fee distribution confirmed. Treasury received " + completed.receivedSol + " SOL. No OpenRouter credits were purchased."
     : "Creator-fee distribution failed on chain. No payout was confirmed.");

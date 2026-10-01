@@ -6,7 +6,8 @@ import TwitterStatus, {
   twitterLabel,
   type TwitterStatusData,
 } from "./twitter-status";
-import { WalletTracker, InstantLaunch, MainCoin } from "./advanced";
+import PublicActivity from "./public-activity";
+import { InstantLaunch } from "./advanced";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Terminal,
@@ -76,6 +77,8 @@ type Data = {
   sessions?: any[];
   support?: any;
   sessionImage?: string;
+  walletReadiness?: Record<string, any>;
+  deployStudy?: any;
   agents: Agent[];
   events: Event[];
   drafts: Draft[];
@@ -153,7 +156,7 @@ function short(value: string) {
 
 export default function DevApp({ user }: { user: { name: string } | null }) {
   const [data, setData] = useState<Data>(EMPTY),
-    [view, setView] = useState("Launch terminal"),
+    [view, setView] = useState("My devs"),
     [name, setName] = useState(""),
     [mission, setMission] = useState(""),
     [model, setModel] = useState(""),
@@ -172,7 +175,9 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
     [wallet, setWallet] = useState(""),
     [query, setQuery] = useState(""),
     [autoRefresh, setAutoRefresh] = useState(false),
-    [tab, setTab] = useState("Proposals");
+    [tab, setTab] = useState("Wallet & launch");
+  const creationId = useRef("");
+  const lastScheduledAgent = useRef("");
   const [keys, setKeys] = useState<Record<string, string>>({}),
     [aiCheck, setAiCheck] = useState<any>(null),
     [launchDraft, setLaunchDraft] = useState<Draft | null>(null),
@@ -279,7 +284,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
   useEffect(() => {
     if (
       !autoRefresh ||
-      !["Tweet tracker", "Launch terminal"].includes(view) ||
+      view !== "Launch terminal" ||
       !user ||
       !(data.twitterStatus?.connected ?? data.connections.x)
     )
@@ -358,20 +363,29 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
       location.href = "/signin-with-chatgpt?return_to=/";
       return;
     }
+    creationId.current ||= crypto.randomUUID();
     const result = await act(
-      "create_agent",
-      { name, mission, model },
-      "Your dev is ready.",
+      "create_agent_wallet",
+      { name, mission, model, creationId: creationId.current },
+      "Your agent and its wallet are created. Fund and activate it next.",
     );
     if (result) {
+      creationId.current = "";
       setActive(result.id);
+      setTab("Wallet & launch");
       setView("My devs");
       setModal(null);
     }
   }
   async function run(id: string) {
+    const session = data.sessions?.find(s => s.agent_id === id);
+    if (!session?.enabled || new Date(session.expires_at).getTime() <= Date.now()) {
+      setActive(id); setTab("Wallet & launch"); setView("My devs");
+      setError("Fund and activate this agent’s wallet before running it.");
+      return;
+    }
     if (!data.connections.openrouter && !data.aiAccess?.available) {
-      setModal("connections");
+      setError("Model access is not configured for this workspace yet.");
       return;
     }
     setRunning(id);
@@ -501,17 +515,18 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
     if (!user) return;
     const timer = setInterval(async () => {
       if (running || busy) return;
-      const s = data.sessions?.find(
-        (s) =>
-          s.enabled &&
-          new Date(s.expires_at).getTime() > Date.now() &&
-          s.used_launches < s.max_launches,
-      );
-      if (!s) return;
+      const eligible = (data.sessions || []).filter(s =>
+        s.enabled && new Date(s.expires_at).getTime() > Date.now() &&
+        s.used_launches < s.max_launches && s.used_lamports < s.max_lamports,
+      ).sort((a, b) => a.agent_id.localeCompare(b.agent_id));
+      if (!eligible.length) return;
+      const previous = eligible.findIndex(s => s.agent_id === lastScheduledAgent.current);
+      const s = eligible[(previous + 1) % eligible.length];
+      lastScheduledAgent.current = s.agent_id;
       try {
-        if ((data.twitterStatus?.connected ?? data.connections.x) && data.tracks.length)
-          await api("refresh_tweets");
-        if (data.wallets?.length) await api("refresh_wallets");
+        if ((data.twitterStatus?.connected ?? data.connections.x) && data.tracks.length) {
+          try { await api("refresh_tweets"); } catch { /* Use saved fresh signals when the provider is temporarily unavailable. */ }
+        }
         await run(s.agent_id);
       } catch (e) {
         setError((e as Error).message);
@@ -526,6 +541,26 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
     (data.twitterStatus?.connected ?? data.connections.x),
     data.tracks.length,
   ]);
+  const pendingLaunches = data.drafts.filter(d => d.status === "submitted" && d.signature).map(d => d.id).join(",");
+  useEffect(() => {
+    if (!user || !pendingLaunches) return;
+    let checking = false, cancelled = false;
+    const confirm = async () => {
+      if (checking || cancelled) return;
+      checking = true;
+      let changed = false;
+      for (const draftId of pendingLaunches.split(",").slice(0, 3)) {
+        if (cancelled) break;
+        try { const result = await api("confirm_launch", { draftId }); if (result.status !== "submitted") changed = true; }
+        catch { /* Pending or unavailable RPC remains unconfirmed; never announce it as a launch. */ }
+      }
+      if (changed && !cancelled) await refresh();
+      checking = false;
+    };
+    void confirm();
+    const timer = setInterval(confirm, 30000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [user, pendingLaunches, refresh]);
   const selected = data.agents.find((a) => a.id === active);
   const selectedDrafts = data.drafts.filter(
     (d) => !active || d.agent_id === active,
@@ -657,24 +692,15 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
     notify,
     setError,
     refresh,
-    learnWallet: (address: string) => {
-      setName("Wallet research dev");
-      setMission(
-        "Study the saved observations for wallet " +
-          address +
-          ". Explain its launch themes, trade timing, and matched buy/sell SOL cashflow when available. Separate observed facts from hypotheses about why trades worked. Never infer lifetime PNL or motives from a partial sample. Use these lessons to propose one original pump.fun coin with a visible thesis and source links.",
-      );
-      setModal("create");
-    },
   };
   const createForm = (
     <form ref={formRef} className="launch-box" onSubmit={create}>
       <div className="panel-title">
-        <h2>Create your dev</h2>
-        <span className="badge green">01 / CONFIGURE</span>
+        <h2>Create your agent</h2>
+        <span className="badge green">MODEL + WALLET</span>
       </div>
       <label className="field">
-        <span>Dev name</span>
+        <span>Agent name</span>
         <input
           className="input"
           value={name}
@@ -724,7 +750,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
           className="input"
           value={mission}
           onChange={(e) => setMission(e.target.value)}
-          placeholder="Find original meme ideas in my tracked tweets and prepare a coin launch…"
+          placeholder="Find a fresh community theme, skip recycled ideas, and explain why a new coin should exist…"
           required
           minLength={12}
           maxLength={3000}
@@ -742,11 +768,16 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
           </button>
         ))}
       </div>
+      <div className="agent-create-wallet">
+        <div className="row between"><h3>We create its wallet.</h3><Wallet size={18} /></div>
+        <p className="smalltext muted">Your agent gets its own Solana wallet automatically. Its deposit address appears next. Fund it with SOL, then set its limits and activate it.</p>
+        <p className="tiny muted">No existing wallet connection needed. Your agent’s name, model, public wallet, confirmed launches and source-backed launch thesis appear publicly. Missions and private execution logs stay in your workspace.</p>
+      </div>
       <div className="launch-bottom">
         <span className="muted">
-          Your dev proposes.
+          Your agent. Its own wallet.
           <br />
-          You control the launch budget.
+          Fund and activate after creation.
         </span>
         <button
           className="button primary"
@@ -754,7 +785,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
           type="submit"
         >
           <Plus size={16} />
-          {busy === "create_agent" ? "Creating…" : "Create dev"}
+          {busy === "create_agent_wallet" ? "Creating…" : "Create agent & wallet"}
         </button>
       </div>
     </form>
@@ -775,17 +806,14 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
             }}
             aria-label="Dev home"
           >
-            <Terminal size={31} strokeWidth={2.6} />
-            dev
+            <span className="bwam-wordmark" role="img" aria-label="bwam" />
           </button>
           <nav className="navlinks" aria-label="Main navigation">
             {[
-              "Launch terminal",
-              "Overview",
               "My devs",
-              "Wallet tracker",
-              "Tweet tracker",
-              "Main coin",
+              "Launch terminal",
+              "Activity",
+              "Overview",
             ].map((v) => (
               <button
                 key={v}
@@ -795,25 +823,16 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                   setActive(null);
                 }}
               >
-                {v}
+                {v === "My devs" ? "Agents" : v}
               </button>
             ))}
           </nav>
           <div className="nav-actions">
             <button
               className="button primary round"
-              onClick={() => setView("Launch terminal")}
+              onClick={() => setModal("create")}
             >
-              Launch
-            </button>
-            <button
-              className="button ghost"
-              onClick={() => setModal("connections")}
-            >
-              <Link2 size={15} />
-              <span>
-                {data.connections.openrouter ? "Connected" : "Connect AI"}
-              </span>
+              Create agent
             </button>
             <button className="button primary round" onClick={connectWallet}>
               <Wallet size={15} />
@@ -822,23 +841,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
           </div>
         </div>
       </header>
-      <div className="ticker">
-        <div className="shell ticker-inner">
-          <b className="ticker-label">
-            <Radio size={13} /> AGENT NETWORK
-          </b>
-          <span>
-            <Cpu size={13} /> Your model. Your API key.
-          </span>
-          <span>
-            <MessageCircle size={13} /> Tweets become launch signals
-          </span>
-          <span>
-            <ShieldCheck size={13} /> Wallet or capped instant mode
-          </span>
-        </div>
-      </div>
-      <main className="shell">
+      <main className={"shell " + (view === "Launch terminal" ? "terminal-shell" : "")}>
         {error && (
           <div className="note error" role="alert">
             <div className="row between">
@@ -861,7 +864,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
             act={act}
             run={run}
             connect={connectWallet}
-            connections={() => setModal("connections")}
+            connections={() => setError("This service is not configured for your workspace yet.")}
             review={(d) => {
               setLaunchDraft(d);
               setLaunchState(null);
@@ -950,7 +953,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                         <h3>{a.name}</h3>
                         <p>{a.model}</p>
                       </div>
-                      <span className="badge green">{a.status}</span>
+                      <span className={"badge " + (data.sessions?.some(s => s.agent_id === a.id && s.enabled && new Date(s.expires_at).getTime() > Date.now()) ? "green" : "")}>{a.status === "running" ? "Working" : data.sessions?.some(s => s.agent_id === a.id && s.enabled && new Date(s.expires_at).getTime() > Date.now()) ? "Active" : data.sessions?.some(s => s.agent_id === a.id) ? "Needs activation" : "Needs wallet"}</span>
                     </button>
                   ))
                 ) : (
@@ -1001,13 +1004,13 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                 ],
                 [
                   "02",
-                  "Tune into the conversation",
-                  "Track accounts and keywords on X. Turn signals into ideas.",
+                  "Fund its own wallet",
+                  "Set a launch allowance, create a dedicated wallet, and add SOL.",
                 ],
                 [
                   "03",
-                  "Review. Sign. Launch.",
-                  "Your dev drafts the coin. You approve the details in your wallet.",
+                  "Activate your agent",
+                  "It evaluates fresh signals and launches within your limits. Creator revenue can support AI costs.",
                 ],
               ].map(([n, h, p]) => (
                 <div className="step" key={n}>
@@ -1021,7 +1024,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
             </div>
             <HomepageStory
               onTerminal={() => setView("Launch terminal")}
-              onWallet={() => setView("Wallet tracker")}
+              onWallet={() => { setView("My devs"); setModal("create"); }}
             />
           </>
         ) : view === "My devs" ? (
@@ -1030,12 +1033,12 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
               <div>
                 <div className="eyebrow">Your workspace</div>
                 <h2 style={{ marginTop: 10 }}>
-                  {selected ? selected.name : "Your autonomous devs"}
+                  {selected ? selected.name : "Your coin developers"}
                 </h2>
                 <p>
                   {selected
                     ? selected.model
-                    : "A model, a mission, and a launch waiting to happen."}
+                    : "Choose the intelligence. Give it a wallet. Let it build within your rules."}
                 </p>
               </div>
               <button
@@ -1045,9 +1048,12 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                 }}
               >
                 <Plus size={15} />
-                New dev
+                Create agent
               </button>
             </div>
+            {!selected && <div className="agent-journey">
+              {[["01", "Choose its intelligence", "Pick an OpenRouter model and give it a mission."], ["02", "Fund its wallet", "We create its wallet. You deposit SOL, then set its launch limits."], ["03", "Activate & follow", "See its proposals, skipped ideas and confirmed launches."], ["04", "Put fees to work", "Route creator revenue toward Dev’s prepaid AI budget."]].map(([n, title, body]) => <div key={n}><span>{n}</span><h3>{title}</h3><p>{body}</p></div>)}
+            </div>}
             {!selected ? (
               <div className="panel">
                 {data.agents.length ? (
@@ -1055,7 +1061,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                     <button
                       key={a.id}
                       className="agentrow"
-                      onClick={() => setActive(a.id)}
+                      onClick={() => { setActive(a.id); setTab("Wallet & launch"); }}
                     >
                       <div className="agent-icon">
                         <ModelAvatar model={a.model} name={a.name} size={30} />
@@ -1064,15 +1070,15 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                         <h3>{a.name}</h3>
                         <p>{a.mission}</p>
                       </div>
-                      <span className="badge green">{a.status}</span>
+                      <span className={"badge " + (data.sessions?.some(s => s.agent_id === a.id && s.enabled && new Date(s.expires_at).getTime() > Date.now()) ? "green" : "")}>{a.status === "running" ? "Working" : data.sessions?.some(s => s.agent_id === a.id && s.enabled && new Date(s.expires_at).getTime() > Date.now()) ? "Active" : data.sessions?.some(s => s.agent_id === a.id) ? "Needs activation" : "Needs wallet"}</span>
                       <ChevronRight size={16} />
                     </button>
                   ))
                 ) : (
                   <div className="empty">
                     <Bot size={30} />
-                    <h3>No devs yet.</h3>
-                    <p>Create a dev to start generating coin proposals.</p>
+                    <h3>Create your first agent.</h3>
+                    <p>Pick a model, describe its mission, and create its dedicated launch wallet.</p>
                     <button
                       className="button"
                       onClick={() => preset(PRESETS[0])}
@@ -1106,13 +1112,13 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                       ) : (
                         <button
                           className="button primary small"
-                          disabled={!!running || selected.status === "running"}
+                          disabled={!!running || selected.status === "running" || !data.sessions?.some(s => s.agent_id === selected.id && s.enabled && new Date(s.expires_at).getTime() > Date.now())}
                           onClick={() => run(selected.id)}
                         >
                           <Zap size={14} />
                           {selected.status === "running"
                             ? "Running…"
-                            : "Run dev"}
+                            : "Run one decision"}
                         </button>
                       )}
                     </div>
@@ -1120,7 +1126,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                 </div>
                 <div className="panel">
                   <div className="tabs">
-                    {["Proposals", "Execution log", "Instant launch"].map(
+                    {["Wallet & launch", "Proposals", "Execution log"].map(
                       (t) => (
                         <button
                           key={t}
@@ -1142,8 +1148,8 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                       Refresh
                     </button>
                   </div>
-                  {tab === "Instant launch" ? (
-                    <InstantLaunch {...advancedProps} agentId={selected.id} />
+                  {tab === "Wallet & launch" ? (
+                    <InstantLaunch key={selected.id} {...advancedProps} agentId={selected.id} />
                   ) : tab === "Execution log" ? (
                     <>
                       <div className="note" style={{ margin: 20 }}>
@@ -1165,7 +1171,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                       <p>
                         {running
                           ? "Open the execution log to follow its progress."
-                          : "Add tweet signals, connect OpenRouter, and run your dev to create a proposal."}
+                          : "Fund and activate its wallet. Fresh signals inform its decisions; weak ideas can be skipped."}
                       </p>
                     </div>
                   )}
@@ -1178,192 +1184,18 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                     All devs
                   </button>
                   <span className="tiny muted">
-                    One run · up to 6 model steps · no automatic transactions
+                    One decision · up to 6 model steps · active agents may launch within approved limits
                   </span>
                 </div>
               </>
             )}
           </section>
-        ) : view === "Wallet tracker" ? (
-          <WalletTracker {...advancedProps} />
-        ) : view === "Main coin" ? (
-          <MainCoin {...advancedProps} />
-        ) : view === "Tweet tracker" ? (
-          <section className="section">
-            <div className="sectionhead">
-              <div>
-                <div className="eyebrow">The signal before the coin</div>
-                <h2 style={{ marginTop: 10 }}>Tweet tracker</h2>
-                <p>
-                  Follow the accounts and conversations your dev should pay
-                  attention to.
-                </p>
-              </div>
-              <button
-                className="button primary"
-                disabled={!!busy || !data.tracks.length}
-                onClick={() =>
-                  (data.twitterStatus?.connected ?? data.connections.x)
-                    ? act("refresh_tweets", {}, "Tweet feed refreshed.")
-                    : setModal("connections")
-                }
-              >
-                <RefreshCw size={14} />
-                {busy === "refresh_tweets" ? "Refreshing…" : "Refresh feed"}
-              </button>
-            </div>
-            <div className="tracker-layout">
-              <aside className="panel">
-                <form
-                  className="trackerform"
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    const r = await act(
-                      "add_track",
-                      { query },
-                      "Tracker added.",
-                    );
-                    if (r) setQuery("");
-                  }}
-                >
-                  <h3 className="subhead" style={{ marginTop: 0 }}>
-                    Watch a conversation
-                  </h3>
-                  <label className="field">
-                    <span>Account, keyword, or X query</span>
-                    <input
-                      className="input"
-                      placeholder="@username or a topic"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      required
-                      maxLength={400}
-                    />
-                  </label>
-                  <button className="button full" disabled={!!busy || !user}>
-                    <Plus size={14} />
-                    Add tracker
-                  </button>
-                  {!user && (
-                    <a
-                      className="button full"
-                      style={{ marginTop: 10 }}
-                      href="/signin-with-chatgpt?return_to=/"
-                    >
-                      Sign in to save trackers
-                    </a>
-                  )}
-                </form>
-                {data.tracks.map((t) => (
-                  <div className="track" key={t.id}>
-                    <div>
-                      <h3>{t.query}</h3>
-                      <p>
-                        {t.last_checked
-                          ? "Checked " + time(t.last_checked)
-                          : "Waiting for first refresh"}
-                      </p>
-                    </div>
-                    <button
-                      className="icon-button"
-                      aria-label={"Remove " + t.query}
-                      onClick={() => act("remove_track", { id: t.id })}
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-                <div style={{ padding: 20 }}>
-                  <label className="row tiny muted">
-                    <input
-                      type="checkbox"
-                      checked={autoRefresh}
-                      onChange={(e) => setAutoRefresh(e.target.checked)}
-                    />
-                    Refresh every 2 minutes while this tab is open
-                  </label>
-                  <p className="tiny muted" style={{ marginTop: 12 }}>
-                    A connected tweet provider is required. Refreshes use
-                    that provider's credits.
-                  </p>
-                </div>
-              </aside>
-              <section className="panel">
-                <div className="panelhead">
-                  <h3>Latest signals</h3>
-                  <span
-                    className={"badge " + ((data.twitterStatus?.connected ?? data.connections.x) ? "green" : "")}
-                  >
-                    {twitterLabel(data.twitterStatus, (data.twitterStatus?.connected ?? data.connections.x))}
-                  </span>
-                </div>
-                <TwitterStatus status={data.twitterStatus} />
-                {data.tweets.length ? (
-                  data.tweets.map((t) => (
-                    <article className="tweet" key={t.id}>
-                      <div className="row between">
-                        <b className="smalltext">@{t.author}</b>
-                        <a
-                          href={t.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-label="Open tweet on X"
-                        >
-                          <ExternalLink size={14} />
-                        </a>
-                      </div>
-                      <p>{t.text}</p>
-                      <div className="tweetfooter">
-                        <span>
-                          {new Date(t.created_at).toLocaleString()} · {t.likes}{" "}
-                          likes
-                        </span>
-                        <span>Available to your devs</span>
-                      </div>
-                    </article>
-                  ))
-                ) : (
-                  <div className="empty">
-                    <Radio size={34} />
-                    <h3>Find your next idea in the feed.</h3>
-                    <p>
-                      Add an account or keyword and connect X to pull in real
-                      tweets. Your dev can use the saved signals in its next
-                      run.
-                    </p>
-                    <button
-                      className="button"
-                      onClick={() => setModal("connections")}
-                    >
-                      {(data.twitterStatus?.connected ?? data.connections.x) ? "Manage tweet access" : "Connect tweet API"}
-                    </button>
-                  </div>
-                )}
-              </section>
-            </div>
-          </section>
         ) : (
-          <section className="section">
-            <div className="sectionhead">
-              <div>
-                <div className="eyebrow">A record of every step</div>
-                <h2 style={{ marginTop: 10 }}>Execution log</h2>
-                <p>
-                  Signals read, proposals created, and launch confirmations.
-                </p>
-              </div>
-              <button className="button" onClick={refresh}>
-                <RefreshCw size={14} />
-                Refresh
-              </button>
-            </div>
-            <div className="panel">{events(data.events)}</div>
-          </section>
+          <PublicActivity create={() => setModal("create")} />
         )}
         <footer className="footer">
-          <button className="brand" onClick={() => setView("Overview")}>
-            <Terminal size={23} />
-            dev
+          <button className="brand" aria-label="Dev home" onClick={() => setView("Overview")}>
+            <span className="bwam-wordmark" role="img" aria-label="bwam" />
           </button>
           <span>From a signal to something of your own.</span>
           <div className="row">
@@ -1375,7 +1207,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
               pump.fun
             </a>
             <span>·</span>
-            <button onClick={() => setModal("connections")}>Connections</button>
+            <a href="/skill.md" target="_blank" rel="noreferrer">Agent skill</a>
           </div>
         </footer>
       </main>
@@ -1396,7 +1228,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
             aria-modal="true"
             aria-label={
               modal === "create"
-                ? "Create a dev"
+                ? "Create an agent"
                 : modal === "connections"
                   ? "Connections"
                   : modal === "example"
@@ -1409,7 +1241,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
             <div className="row between">
               <h2>
                 {modal === "create"
-                  ? "Launch your dev."
+                  ? "Your next coin developer."
                   : modal === "connections"
                     ? "Make the connections."
                     : modal === "example"

@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Dev — Autonomous coin creators",
   description:
-    "Create an AI dev, choose your OpenRouter model, track tweets, and prepare your next pump.fun launch.",
+    "Create an autonomous coin developer, choose its intelligence, fund its dedicated wallet, and follow verified launches on Solana.",
   other: {
     "codex-preview": "development",
   },

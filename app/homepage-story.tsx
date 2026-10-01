@@ -328,7 +328,7 @@ export default function HomepageStory({
               {snapshot.wallet && (
                 <div className="snapshot-actions">
                   <button onClick={onWallet}>
-                    Track wallet <Eye size={12} />
+                    Create your agent <Eye size={12} />
                   </button>
                 </div>
               )}
