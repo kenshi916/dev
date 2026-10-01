@@ -1,0 +1,658 @@
+.homepage-story {
+  margin: 24px 0 0;
+}
+.story-section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font:
+    10px GeistMono,
+    monospace;
+  color: #92a197;
+  letter-spacing: 1px;
+  padding-top: 28px;
+  border-top: 1px solid #343b37;
+}
+.story-section-label > span:last-child {
+  color: #656e69;
+  font-size: 9px;
+}
+.space-problem {
+  padding-top: 22px;
+}
+.problem-layout {
+  display: grid;
+  grid-template-columns: 0.92fr 1fr;
+  gap: 66px;
+  align-items: center;
+  margin-top: 48px;
+}
+.problem-copy h2,
+.wallet-study h2 {
+  font:
+    600 clamp(36px, 4.2vw, 55px)/1.04 Syne,
+    Arial;
+  letter-spacing: -2px;
+}
+.problem-copy h2 em {
+  color: #a0aaa3;
+  font-style: normal;
+}
+.problem-copy > p {
+  font-size: 15px;
+  color: #969f99;
+  line-height: 1.85;
+  margin-top: 25px;
+  max-width: 415px;
+}
+.problem-copy .problem-principle {
+  border-left: 2px solid #8af2b3;
+  padding-left: 16px;
+  margin-top: 26px;
+  font-size: 13px;
+}
+.problem-principle strong {
+  color: #d5ded8;
+  font-weight: 450;
+}
+.story-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #a0e6b8;
+  padding: 0;
+  margin-top: 27px;
+  font-size: 12px;
+}
+.playbook-animation {
+  background: #191c1d;
+  border: 1px solid #373d3b;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 15px 70px #0002;
+}
+.playbook-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  border-bottom: 1px solid #303633;
+  font:
+    9px GeistMono,
+    monospace;
+  color: #929c96;
+  gap: 10px;
+}
+.playbook-top > span,
+.playbook-top button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.playbook-top button {
+  font:
+    10px Geist,
+    Arial;
+  color: #bac7be;
+  padding: 0;
+}
+.playbook-scene {
+  height: 300px;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, #34403a40, transparent 70%);
+}
+.cycle-orbit {
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border: 1px dashed #47544d;
+  left: calc(50% - 110px);
+  top: 40px;
+  border-radius: 50%;
+}
+.orbit-two {
+  width: 145px;
+  height: 145px;
+  left: calc(50% - 72.5px);
+  top: 77.5px;
+  border-style: solid;
+  border-color: #2f3933;
+}
+.cycle-core {
+  position: absolute;
+  left: calc(50% - 41px);
+  top: 109px;
+  width: 82px;
+  height: 82px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #576258;
+  border-radius: 18px;
+  background: #252c27;
+  color: #adb6af;
+  box-shadow: 0 0 35px #101713;
+}
+.cycle-core span {
+  font:
+    8px GeistMono,
+    monospace;
+  letter-spacing: 2px;
+}
+.cycle-tile {
+  position: absolute;
+  width: 120px;
+  height: 70px;
+  border: 1px solid #454846;
+  background: #202323;
+  border-radius: 7px;
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-content: center;
+  column-gap: 8px;
+  row-gap: 4px;
+  padding: 10px;
+  transition:
+    border-color 0.5s,
+    background 0.5s,
+    transform 0.5s,
+    color 0.5s;
+  z-index: 2;
+  color: #838c87;
+}
+.cycle-tile svg {
+  grid-row: span 2;
+  align-self: center;
+}
+.cycle-tile span {
+  font:
+    8px GeistMono,
+    monospace;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.cycle-tile small {
+  font-size: 9px;
+  color: #748078;
+}
+.tile-copy {
+  left: calc(50% - 140px);
+  top: 20px;
+  transform: rotate(-7deg);
+}
+.tile-launch {
+  right: calc(50% - 193px);
+  top: 106px;
+  transform: rotate(7deg);
+}
+.tile-silence {
+  left: calc(50% - 53px);
+  top: 213px;
+  transform: rotate(4deg);
+}
+.tile-repeat {
+  left: calc(50% - 190px);
+  top: 162px;
+  transform: rotate(-8deg);
+}
+.cycle-tile.is-current {
+  color: #ffb2a4;
+  border-color: #b87567;
+  background: #342927;
+  transform: rotate(0deg) translateY(-3px);
+}
+.cycle-tile.is-current small {
+  color: #bf968b;
+}
+.cycle-particle {
+  position: absolute;
+  top: 147px;
+  left: calc(50% - 3px);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #cd8d7e;
+  box-shadow: 0 0 13px #e7aa76;
+  transform-origin: 3px 3px;
+  opacity: 0;
+}
+.is-animating .cycle-particle {
+  opacity: 0.8;
+  animation: orbit-cycle 12.8s linear infinite;
+}
+.is-animating .particle-two {
+  animation-delay: -6.4s;
+}
+@keyframes orbit-cycle {
+  from {
+    transform: rotate(0deg) translateX(110px);
+  }
+  to {
+    transform: rotate(360deg) translateX(110px);
+  }
+}
+.playbook-caption {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 7px 20px 5px;
+  min-height: 92px;
+}
+.playbook-caption > svg {
+  color: #c59b8e;
+  margin-top: 3px;
+}
+.playbook-caption strong {
+  font-size: 14px;
+  color: #d7deda;
+  font-weight: 500;
+}
+.playbook-caption p {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #8d9a92;
+  line-height: 1.7;
+  max-width: 330px;
+}
+.playbook-controls {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+  padding: 0 20px 15px;
+}
+.playbook-controls button {
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #858d89;
+  font:
+    8px GeistMono,
+    monospace;
+}
+.playbook-controls i {
+  display: block;
+  height: 2px;
+  background: #3c4540;
+  flex: 1;
+}
+.playbook-controls i.selected {
+  background: #dca998;
+}
+.playbook-footnote {
+  border-top: 1px solid #303633;
+  padding: 10px;
+  text-align: center;
+  color: #737f77;
+  font-size: 9px;
+}
+.story-bridge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 56px 0 8px;
+  color: #829889;
+}
+.story-bridge span {
+  flex: 1;
+  height: 1px;
+  background: #343f37;
+}
+.story-bridge b {
+  font:
+    9px GeistMono,
+    monospace;
+  letter-spacing: 1px;
+}
+.wallet-study {
+  padding-top: 25px;
+}
+.wallet-study .story-section-label {
+  border: 0;
+}
+.wallet-study-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 35px;
+  margin: 40px 0 35px;
+}
+.story-kicker {
+  font:
+    9px GeistMono,
+    monospace;
+  letter-spacing: 1.3px;
+  color: #84bc97;
+}
+.wallet-study h2 {
+  margin-top: 14px;
+}
+.wallet-study h2 em {
+  color: #8af2b3;
+  font-style: normal;
+}
+.wallet-study-heading > p {
+  max-width: 285px;
+  font-size: 13px;
+  line-height: 1.85;
+  color: #959f98;
+  margin-bottom: 3px;
+}
+
+.wallet-screenshots {
+  display: grid;
+  gap: 24px;
+}
+.wallet-screenshot {
+  margin: 0;
+  border: 1px solid #3b4c41;
+  border-radius: 12px;
+  background: #191d1b;
+  overflow: hidden;
+  box-shadow: 3px 3px 0 #86efac;
+}
+.wallet-revealed .wallet-screenshot {
+  animation: screenshot-reveal 0.7s ease-out both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+@keyframes screenshot-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.snapshot-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 21px 25px;
+  border-bottom: 1px solid #35453a;
+  background: linear-gradient(120deg, #263b2d70, transparent);
+}
+.snapshot-heading h3 {
+  margin: 8px 0 0;
+  font:
+    600 26px Syne,
+    Arial;
+  letter-spacing: -0.8px;
+}
+.snapshot-heading h3 > span {
+  font:
+    10px GeistMono,
+    monospace;
+  color: #829b8b;
+  margin-left: 13px;
+  letter-spacing: 0;
+}
+.snapshot-pnl {
+  text-align: right;
+}
+.snapshot-pnl small {
+  display: block;
+  font:
+    8px GeistMono,
+    monospace;
+  color: #8ca897;
+  letter-spacing: 0.8px;
+}
+.snapshot-pnl strong {
+  display: block;
+  font:
+    500 34px Geist,
+    Arial;
+  color: #6ee2ac;
+  letter-spacing: -1.4px;
+  margin-top: 3px;
+}
+.snapshot-image-link {
+  display: block;
+  background: #151619;
+}
+.snapshot-image-link img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.snapshot-activity-link {
+  border-top: 1px solid #303b33;
+}
+.snapshot-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 20px;
+  font-size: 10px;
+  border-top: 1px solid #303b33;
+}
+.snapshot-actions > span {
+  color: #7f9286;
+  margin-right: auto;
+}
+.snapshot-actions a,
+.snapshot-actions button {
+  color: #9bd9b0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  font-size: 10px;
+  min-height: 32px;
+}
+.snapshot-context {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 10px;
+  line-height: 1.7;
+  color: #7e9084;
+  margin: 19px 0 0;
+  max-width: 860px;
+}
+.snapshot-context > svg {
+  margin-top: 2px;
+}
+.playbook-top button {
+  min-height: 32px;
+}
+.playbook-controls button {
+  min-height: 32px;
+}
+.story-resolution {
+  display: flex;
+  align-items: center;
+  gap: 23px;
+  margin: 55px 0 40px;
+  padding: 32px 0;
+}
+.story-dev-mark {
+  display: grid;
+  place-items: center;
+  border: 1px solid #45634e;
+  color: #8af2b3;
+  border-radius: 12px;
+  height: 52px;
+  width: 52px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 5px;
+}
+.story-resolution > div:nth-child(2) {
+  max-width: 540px;
+}
+.story-resolution h3 {
+  font:
+    500 33px/1.18 Syne,
+    Arial;
+  letter-spacing: -1px;
+  margin: 10px 0;
+}
+.story-resolution h3 em {
+  color: #9acdac;
+  font-style: normal;
+}
+.story-resolution p {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #8c9c92;
+}
+.story-resolution .button {
+  margin-left: auto;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+@media (max-width: 1000px) {
+  .problem-layout {
+    gap: 28px;
+  }
+  .cycle-tile {
+    width: 105px;
+    padding: 8px;
+    gap: 4px;
+  }
+  .tile-launch {
+    right: calc(50% - 163px);
+  }
+  .tile-repeat {
+    left: calc(50% - 161px);
+  }
+}
+@media (max-width: 760px) {
+  .story-section-label {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .story-section-label > span:last-child {
+    font-size: 8px;
+  }
+  .problem-layout {
+    grid-template-columns: 1fr;
+    gap: 27px;
+    margin-top: 30px;
+  }
+  .problem-copy h2,
+  .wallet-study h2 {
+    font-size: 38px;
+    letter-spacing: -1.4px;
+  }
+  .problem-copy > p {
+    font-size: 14px;
+    max-width: none;
+  }
+  .playbook-scene {
+    height: 290px;
+  }
+  .tile-copy {
+    left: calc(50% - 124px);
+  }
+  .tile-launch {
+    right: 8px;
+  }
+  .tile-repeat {
+    left: 8px;
+  }
+  .tile-silence {
+    top: 205px;
+  }
+  .cycle-tile {
+    width: 108px;
+  }
+  .playbook-caption {
+    min-height: 110px;
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+  .playbook-top button,
+  .playbook-controls button {
+    min-height: 44px;
+  }
+  .story-bridge {
+    margin-top: 36px;
+    gap: 8px;
+  }
+  .story-bridge b {
+    font-size: 7px;
+    letter-spacing: 0.4px;
+  }
+  .wallet-study-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+    margin-top: 30px;
+  }
+  .wallet-study-heading > p {
+    max-width: none;
+  }
+  .snapshot-heading {
+    padding: 16px 13px;
+    gap: 10px;
+  }
+  .snapshot-heading .story-kicker {
+    font-size: 7px;
+    letter-spacing: 0.5px;
+  }
+  .snapshot-heading h3 {
+    font-size: 23px;
+  }
+  .snapshot-heading h3 > span {
+    display: block;
+    margin: 5px 0 0;
+    font-size: 9px;
+  }
+  .snapshot-pnl strong {
+    font-size: 27px;
+  }
+  .snapshot-pnl small {
+    font-size: 7px;
+    letter-spacing: 0;
+  }
+  .snapshot-actions {
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    padding: 12px;
+  }
+  .snapshot-actions > span {
+    width: 100%;
+    font-size: 9px;
+  }
+  .snapshot-actions a,
+  .snapshot-actions button {
+    min-height: 36px;
+  }
+  .story-resolution {
+    flex-wrap: wrap;
+    gap: 17px;
+    margin-top: 26px;
+  }
+  .story-resolution > div:nth-child(2) {
+    flex: 1;
+    min-width: 200px;
+  }
+  .story-resolution h3 {
+    font-size: 27px;
+  }
+  .story-resolution .button {
+    margin-left: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .homepage-story *,
+  .homepage-story *::before,
+  .homepage-story *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .cycle-particle {
+    display: none;
+  }
+}

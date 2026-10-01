@@ -1,0 +1,147 @@
+{
+  "meta": {
+    "page": "https://openrouter.ai/meta-llama",
+    "file": "meta.png",
+    "url": "https://openrouter.ai/images/icons/Meta.png"
+  },
+  "openai": {
+    "page": "https://openrouter.ai/models",
+    "file": "openai.svg",
+    "url": "https://openrouter.ai/images/icons/OpenAI.svg"
+  },
+  "mistralai": {
+    "page": "https://openrouter.ai/mistralai",
+    "file": "mistralai.png",
+    "url": "https://openrouter.ai/images/icons/Mistral.png"
+  },
+  "qwen": {
+    "page": "https://openrouter.ai/qwen",
+    "file": "qwen.png",
+    "url": "https://openrouter.ai/images/icons/Qwen.png"
+  },
+  "cohere": {
+    "page": "https://openrouter.ai/cohere",
+    "file": "cohere.png",
+    "url": "https://openrouter.ai/images/icons/Cohere.png"
+  },
+  "deepseek": {
+    "page": "https://openrouter.ai/deepseek",
+    "file": "deepseek.png",
+    "url": "https://openrouter.ai/images/icons/DeepSeek.png"
+  },
+  "moonshotai": {
+    "page": "https://openrouter.ai/moonshotai",
+    "file": "moonshotai.png",
+    "url": "https://openrouter.ai/images/icons/MoonshotAI.png"
+  },
+  "google": {
+    "page": "https://openrouter.ai/models",
+    "file": "google.svg",
+    "url": "https://openrouter.ai/images/icons/GoogleGemini.svg"
+  },
+  "inception": {
+    "page": "https://openrouter.ai/models",
+    "file": "inception.svg",
+    "url": "https://openrouter.ai/images/icons/Inception.svg"
+  },
+  "anthropic": {
+    "page": "https://openrouter.ai/models",
+    "file": "anthropic.svg",
+    "url": "https://openrouter.ai/images/icons/Anthropic.svg"
+  },
+  "x-ai": {
+    "file": "x-ai.png",
+    "page": "https://openrouter.ai/x-ai",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://x.ai/&size=256"
+  },
+  "z-ai": {
+    "file": "z-ai.png",
+    "page": "https://openrouter.ai/z-ai",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://z.ai/&size=256"
+  },
+  "minimax": {
+    "file": "minimax.png",
+    "page": "https://openrouter.ai/minimax",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://minimaxi.com/&size=256"
+  },
+  "nvidia": {
+    "file": "nvidia.png",
+    "page": "https://openrouter.ai/nvidia",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://nvidia.com/&size=256"
+  },
+  "amazon": {
+    "file": "amazon.png",
+    "page": "https://openrouter.ai/amazon",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://nova.amazon.com/&size=256"
+  },
+  "bytedance-seed": {
+    "file": "bytedance-seed.png",
+    "page": "https://openrouter.ai/bytedance-seed",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://seed.bytedance.com/&size=256"
+  },
+  "stepfun": {
+    "file": "stepfun.png",
+    "page": "https://openrouter.ai/stepfun",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://platform.stepfun.ai/&size=256"
+  },
+  "xiaomi": {
+    "file": "xiaomi.png",
+    "page": "https://openrouter.ai/xiaomi",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.mi.com&size=256"
+  },
+  "aion-labs": {
+    "file": "aion-labs.png",
+    "page": "https://openrouter.ai/aion-labs",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.aionlabs.ai/&size=256"
+  },
+  "inclusionai": {
+    "file": "inclusionai.png",
+    "page": "https://openrouter.ai/inclusionai",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.inclusion-ai.org/&size=256"
+  },
+  "thinkingmachines": {
+    "file": "thinkingmachines.png",
+    "page": "https://openrouter.ai/thinkingmachines",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://thinkingmachines.ai/&size=256"
+  },
+  "sakana": {
+    "file": "sakana.png",
+    "page": "https://openrouter.ai/sakana",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://sakana.ai&size=256"
+  },
+  "upstage": {
+    "file": "upstage.png",
+    "page": "https://openrouter.ai/upstage",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.upstage.ai/&size=256"
+  },
+  "perceptron": {
+    "file": "perceptron.png",
+    "page": "https://openrouter.ai/perceptron",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.perceptron.inc&size=256"
+  },
+  "fireworks": {
+    "file": "fireworks.png",
+    "page": "https://openrouter.ai/fireworks",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://fireworks.ai&size=256"
+  },
+  "arcee-ai": {
+    "file": "arcee-ai.png",
+    "page": "https://openrouter.ai/arcee-ai",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.arcee.ai&size=256"
+  },
+  "liquid": {
+    "file": "liquid.png",
+    "page": "https://openrouter.ai/liquid",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.liquid.ai/&size=256"
+  },
+  "relace": {
+    "file": "relace.png",
+    "page": "https://openrouter.ai/relace",
+    "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.relace.ai&size=256"
+  },
+  "openrouter": {
+    "file": "openrouter.png",
+    "page": "https://openrouter.ai/models",
+    "url": "https://openrouter.ai/favicon/glyph.png"
+  }
+}
