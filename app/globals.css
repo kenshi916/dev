@@ -2857,3 +2857,29 @@ h2,
 .reference-links { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11px; }
 @media(max-width: 1000px) { .social-link > span { display: none; } .nav-skill { padding: 5px; } }
 @media(max-width: 700px) { .study-heading { align-items: flex-start; flex-direction: column; } .study-metrics, .study-coins, .study-lessons { grid-template-columns: 1fr; } .study-metrics > div + div { border-left: 0; border-top: 1px solid var(--line); } .skill-guide { flex-wrap: wrap; } .skill-guide > span:last-child { margin-left: 0; } }
+.bwa-live { margin: 0 26px 24px; border: 1px solid var(--line); border-radius: 10px; background: #121917; overflow: hidden; }
+.live-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 20px 20px 12px; }
+.live-heading h4 { display: flex; gap: 8px; align-items: center; margin: 0 0 7px; font-size: 15px; }
+.live-heading p { margin: 0; font-size: 12px; color: var(--muted); }
+.live-heading > .row { flex-shrink: 0; }
+.live-status { display: flex; flex-wrap: wrap; gap: 14px; padding: 0 20px 16px; font-size: 10px; color: var(--muted); }
+.live-status > span:first-child { color: #a8d7ba; }
+.live-rpc { padding: 18px 20px; border-top: 1px solid var(--line); }
+.live-rpc label { font-size: 12px; display: block; margin-bottom: 10px; }
+.live-rpc > div { display: flex; gap: 10px; }
+.live-rpc input { background: #0c110f; border: 1px solid var(--line); border-radius: 7px; flex: 1; min-width: 0; padding: 10px 12px; font-size: 12px; }
+.live-rpc p, .live-scope { color: var(--muted); font-size: 10px; line-height: 1.65; }
+.live-rpc p { margin: 9px 0 0; }
+.live-scope { margin: 0; padding: 14px 20px; border-top: 1px solid var(--line); }
+.live-empty { color: var(--muted); font-size: 12px; padding: 0 20px 16px; margin: 0; }
+.live-transactions { max-height: 570px; overflow-y: auto; }
+.live-transactions article { border-top: 1px solid var(--line); padding: 16px 20px; }
+.live-transaction-head, .live-transaction-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 10px; color: var(--muted); }
+.live-action { color: #b9dac5; font-weight: 600; font-size: 11px; }
+.live-action.pending { color: #d6bf96; }
+.live-action.failed { color: #e99a9a; }
+.live-coin { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; margin-top: 12px; color: #b4edc8; }
+.live-transactions article p { color: #c2ccc6; font-size: 12px; line-height: 1.7; margin: 10px 0 12px; }
+.live-transaction-foot a { display: inline-flex; align-items: center; gap: 6px; }
+.live-transactions article > small { display: block; color: var(--muted); font-size: 9px; line-height: 1.6; margin-top: 10px; }
+@media(max-width:700px) { .live-heading, .live-transaction-foot { flex-wrap: wrap; } .live-rpc > div { flex-direction: column; } }

@@ -64,6 +64,8 @@ The Agents page's bwa study shows verified creates, sampled trade cashflows and 
 
 A separately dated robotics reference case includes five public RPC archives under `research/bwa-live-20261001`, reconciled cashflow, a fully sold token position and an aggregate creator-vault receipt. Its selected cashflow is not mixed into live matched-trade totals, and the vault receipt is not attributed to robotics. This reference is background for learning, never a fresh launch trigger. Artwork, source tweet, competitor order and lifetime PNL are unverified.
 
+**Current wallet activity** adds opt-in ten-second polling while the Agents page is visible. A dedicated mainnet RPC is required and can be saved encrypted inline. The owner-scoped ingestion lease, frozen pagination boundary and durable pending records prevent overlapping tabs and bursts from silently skipping pages; unavailable details retry with backoff. The initial window is the latest100 address-referencing transactions; later activity is retained and the latest60 rows shown. Explicit gaps remain visible. Supported Pump actions and native creator-vault receipts have deterministic evidence summaries; other protocols and token-account-only coverage are limited. This feed does not use OpenRouter, become fresh launch evidence or claim private motives, price causality or lifetime profit. It is not a hosted scheduler or a push stream.
+
 Provider logos come from OpenRouter's catalog and provider pages; provenance is in `public/model-icons/sources.json`. The supplied bwam wordmark is green in the header/footer. The homepage retains supplied wallet screenshots as historical reference images, not live verified PNL.
 
 ## AI funding from launched coins

@@ -8,7 +8,7 @@ export { refreshTweets } from "./twitter-provider";
 type JsonObject = Record<string, unknown>;
 const object = (value: unknown): JsonObject => value && typeof value === "object" && !Array.isArray(value) ? value as JsonObject : {};
 const array = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
-function launchInTransaction(value: unknown, wallet: string) {
+export function launchInTransaction(value: unknown, wallet: string) {
   const tx = object(value), message = object(object(tx.transaction).message), meta = object(tx.meta);
   const keys = array(message.accountKeys);
   if (!keys.some((key) => object(key).pubkey === wallet && object(key).signer === true)) return null;

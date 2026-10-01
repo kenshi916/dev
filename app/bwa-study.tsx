@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { BookOpen, Coins, ExternalLink, RefreshCw } from "lucide-react";
 import { BWA_REFERENCE_CASE as reference } from "./bwa-reference";
+import BwaLive from "./bwa-live";
 
 const wallet = "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa";
 function sol(value: string | null | undefined) {
@@ -17,12 +18,13 @@ function StudyCoin({ coin }: { coin: any }) {
     <details><summary>Evidence & what we can learn</summary><ul>{coin.observations?.map((text: string) => <li key={text}>{text}</li>)}</ul><p>{coin.unknowns?.join(" ")}</p>{coin.roundTrips?.map((trip: any, index: number) => <p key={index}>{sol(trip.netSolCashflowLamports)} · {trip.holdingSeconds == null ? "Holding time unknown" : trip.holdingSeconds + "s held"} {trip.sources.map((s: any, i: number) => <a key={s.signature} href={s.url} target="_blank" rel="noreferrer">Tx {i + 1} </a>)}</p>)}</details>
   </article>;
 }
-export default function BwaStudy({ study, busy, disabled, refresh }: { study: any; busy: boolean; disabled?: boolean; refresh: () => Promise<unknown> }) {
+export default function BwaStudy({ study, busy, disabled, refresh, saveRpc }: { study: any; busy: boolean; disabled?: boolean; refresh: () => Promise<unknown>; saveRpc: (url: string) => Promise<boolean> }) {
   const [expanded, setExpanded] = useState(false);
   const summary = study?.version === 2 ? study.summary : null;
   return <section className="bwa-study" aria-label="bwa deployment study">
     <div className="study-heading"><div><span className="eyebrow"><BookOpen size={12} /> LEARN FROM THE CHAIN</span><h3>bwa’s deploy study</h3><p>Real launches. Measured outcomes. A better question than “copy the winner.”</p></div><button className="button small" disabled={disabled} onClick={async () => { setExpanded(true); await refresh(); }}><RefreshCw size={13} className={busy ? "spin" : ""} />{busy ? "Scanning…" : "Study recent deploys"}</button></div>
     <div className="study-context"><a href={"https://solscan.io/account/" + wallet} target="_blank" rel="noreferrer">bwam…fSXa <ExternalLink size={11} /></a><span>{study?.checkedAt ? "Checked " + new Date(study.checkedAt).toLocaleString() : "No scan saved yet"}</span><span>Partial history</span></div>
+    <BwaLive saveRpc={saveRpc} />
     {study?.refreshError && <p className="study-status" role="status">{study.refreshError}</p>}
     <div className="study-metrics"><div><small>VERIFIED DEPLOYS</small><strong>{summary?.deploymentCount ?? "—"}</strong><span>in saved observations</span></div><div><small>MATCHED LAUNCH-COIN TRADES</small><strong>{sol(summary?.deployedCoinMatchedNetSolLamports)}</strong><span>{summary?.deployedCoinMatchedRoundTrips ?? 0} complete sampled round trips</span></div><div><small>LIFETIME EARNINGS</small><strong>Not established</strong><span>Trading cashflow ≠ creator revenue</span></div></div>
     <article className="bwa-reference"><div className="bwa-reference-heading"><h4>A verified case: <a href={"https://pump.fun/coin/" + reference.mint} target="_blank" rel="noreferrer">{reference.name} · ${reference.symbol}</a></h4><span>Launched {new Date(reference.deployedAt).toLocaleDateString()}</span></div><div className="reference-result"><strong>{sol(String(reference.cashflowLamports))}</strong><span>Observed cashflow including fee setup · {reference.holdingSeconds}s to fully sell the observed position</span></div><p>{reference.observation} Separately, a creator-vault collection transferred <b>{sol(String(reference.aggregateCreatorReceiptLamports))}</b> across unspecified coins.</p><div className="reference-links">{reference.sources.map(source => <a key={source.label} href={source.url} target="_blank" rel="noreferrer">{({create: "Launch & buy", "fee-setup": "Fee setup", "sell-one": "First sell", "sell-two": "Final sell", "aggregate-fee-collection": "Creator receipt"} as Record<string, string>)[source.label]}</a>)}</div><p>{reference.limitation} Research checked {new Date(reference.checkedAt).toLocaleString()}.</p></article>

@@ -35,6 +35,12 @@ Learn naming, theme and observed cadence patterns as sample-based inferences. To
 
 Historical observations provide context. Launch evidence must be unused and no more than six hours old: public tweet signals or verified reference-wallet deployments with a known transaction time. An empty, stale or already-used source set skips inference and launching.
 
+## Current wallet activity
+
+On Agents, the bwa study also offers **Start updates**. Connect a dedicated mainnet RPC through its encrypted endpoint field, then enable monitoring. It checks every ten seconds while the page is visible. This is near-live polling, not push streaming or a hosted background service. Its first connection starts with the latest 100 address-referencing transactions; newer pages are queued, deduplicated and retried, and the latest 60 entries are displayed. Catch-up, pending details and history gaps are explicit. Token-account-only movements may be missing, and unsupported protocols stay unclassified.
+
+Decoded Pump buys/sells, creates and native creator-vault receipts get factual action summaries. A wallet SOL delta includes costs and possibly transfers or rent refunds; it is not profit. An aggregate creator receipt is not attributed to a particular coin. The feed cannot know the wallet owner's motives or establish why a price moved. No inference call, trading authority or model credits are used by these deterministic summaries. This activity feed is separate from the bounded deployment-learning sample and does not make pending transactions eligible launch evidence.
+
 ## Native model tools
 
 These tools exist inside Dev's run loop; they are not public HTTP endpoints.

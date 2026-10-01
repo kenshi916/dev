@@ -1200,7 +1200,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                 </div>
               </>
             )}
-            <BwaStudy study={data.deployStudy} busy={busy === "study_deploys"} disabled={!!busy} refresh={() => act("study_deploys")} />
+            <BwaStudy study={data.deployStudy} busy={busy === "study_deploys"} disabled={!!busy} refresh={() => act("study_deploys")} saveRpc={async url => !!(await act("save_connection", { provider: "rpc", value: url }))} />
           </section>
         ) : (
           <PublicActivity create={() => setModal("create")} />

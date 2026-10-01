@@ -221,7 +221,7 @@ export function httpsPublic(value: string) {
     throw new AppError("Use a public HTTPS endpoint.");
   return u.toString();
 }
-export async function rpc(owner: string, method: string, params: any[]) {
+export async function rpc(owner: string, method: string, params: any[], options: { signal?: AbortSignal } = {}) {
   let url: string;
   try {
     url = await secret(owner, "rpc");
@@ -240,6 +240,7 @@ export async function rpc(owner: string, method: string, params: any[]) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      signal: options.signal,
     },
     "Solana RPC",
   );
