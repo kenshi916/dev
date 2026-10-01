@@ -151,7 +151,7 @@ test("large raw amounts are preserved without floating point rounding", () => {
   assert.equal(formatRaw("-10000", 9), "-0.00001");
 });
 
-function scannerHarness(t, transactions) {
+function scannerHarness(t, transactions, options = {}) {
   const db = new DatabaseSync(":memory:"); t.after(() => db.close());
   db.exec("CREATE TABLE tracks(id TEXT, owner TEXT, kind TEXT, query TEXT, last_checked TEXT); CREATE TABLE signals(id TEXT,owner TEXT,kind TEXT,source TEXT,text TEXT,created_at TEXT,url TEXT,likes INTEGER,PRIMARY KEY(id,owner));");
   db.prepare("INSERT INTO tracks VALUES('track','owner','wallet',?,NULL)").run(WALLET);
@@ -163,10 +163,13 @@ function scannerHarness(t, transactions) {
     one: async (sql, ...args) => db.prepare(sql).get(...args),
     change: async (sql, ...args) => ({ meta: { changes: db.prepare(sql).run(...args).changes } }),
     event: async (...args) => { events.push(args); },
-    external: async () => ({ json: async () => ({ description: "Public launch metadata" }) }),
+    external: async () => {
+      if (options.metadataError) throw new Error("Metadata unavailable");
+      return { json: async () => options.metadata || ({ description: "Public launch metadata", image_uri: "https://ipfs.io/ipfs/actual-launch-art" }) };
+    },
     rpc: async (owner, method, args) => {
       assert.equal(owner, "owner"); calls.push({ method, args });
-      if (method === "getSignaturesForAddress") return Object.keys(transactions).map((signature) => ({ signature, err: null }));
+      if (method === "getSignaturesForAddress") return Object.keys(transactions).map((signature) => ({ signature, err: options.failedSignatures?.includes(signature) ? { InstructionError: [0, "Custom"] } : null }));
       if (method === "getTransaction") { const value = transactions[args[0]]; if (value instanceof Error) throw value; return value; }
       throw new Error("Unexpected method " + method);
     },
@@ -179,7 +182,7 @@ function scannerHarness(t, transactions) {
   vm.runInNewContext(source, { module: mod, exports: mod.exports, Buffer,
     require(name) { if (name in dependencies) return dependencies[name]; throw new Error("Unexpected dependency " + name); },
   });
-  return { db, calls, events, refresh: () => mod.exports.refreshWallets("owner") };
+  return { db, calls, events, refresh: (options) => mod.exports.refreshWallets("owner", undefined, options) };
 }
 test("scanner persists source-linked analysis, preserves launches and legacy IDs, and respects cooldown", async (t) => {
   const created = transaction({ flow: 0 });
@@ -197,6 +200,7 @@ test("scanner persists source-linked analysis, preserves launches and legacy IDs
   for (const row of rows) { assert.match(row.text, /^\{"summary":/); assert.match(row.url, /^https:\/\/solscan.io\/tx\//); }
   const launch = rows.map((r) => JSON.parse(r.text)).find((r) => r.observation === "launch");
   assert.equal(launch.name, "Test Launch"); assert.equal(launch.description, "Public launch metadata");
+  assert.equal(launch.image, "https://ipfs.io/ipfs/actual-launch-art");
   const exit = rows.map((r) => JSON.parse(r.text)).find((r) => r.analysis.signature === "exit");
   assert.equal(exit.analysis.matchedRoundTrips[0].netSolCashflowLamports, "999990000");
   assert.match(exit.summary, /0.99999 SOL net cashflow/);
@@ -209,4 +213,75 @@ test("scanner surfaces RPC access failure rather than reporting no activity", as
   await assert.rejects(h.refresh, /RPC access unavailable/);
   assert.equal(h.events.length, 0);
   assert.equal(h.db.prepare("SELECT count(*) AS n FROM signals").get().n, 0);
+});
+
+function createdV2Transaction() {
+  const created = transaction({ flow: 0 });
+  const string = (value) => { const bytes = Buffer.from(value); const length = Buffer.alloc(4); length.writeUInt32LE(bytes.length); return Buffer.concat([length, bytes]); };
+  const accounts = Array(8).fill("other"); accounts[0] = PUMP_PROGRAM; accounts[5] = WALLET;
+  created.transaction.message.instructions = [{ programId: PUMP_PROGRAM, accounts,
+    data: bs58.encode(Buffer.concat([Buffer.from([214, 144, 76, 236, 95, 139, 49, 180]), string("Test Launch"), string("TEST"), string("https://example.com/token.json"), new PublicKey(PUMP_PROGRAM).toBuffer()])) }];
+  created.version = 1;
+  return created;
+}
+
+test("scanner defaults to 12 transactions and clamps manual deep scans to 80 even if RPC overreturns", async (t) => {
+  for (const [requested, expected] of [[undefined, 12], [80, 80], [1000, 80], [-3, 12], [17.9, 17]]) {
+    const transactions = Object.fromEntries(Array.from({ length: 100 }, (_, n) => ["tx-" + n, transaction({ time: 1000 - n })]));
+    const h = scannerHarness(t, transactions);
+    const result = await h.refresh(requested === undefined ? undefined : { limit: requested });
+    assert.equal(h.calls[0].method, "getSignaturesForAddress");
+    assert.equal(h.calls[0].args[1].limit, expected);
+    assert.equal(h.calls.filter((call) => call.method === "getTransaction").length, expected);
+    assert.equal(result.examined, expected);
+    assert.equal(h.db.prepare("SELECT count(*) AS n FROM signals").get().n, expected);
+  }
+});
+
+test("scanner requests parsed transaction version 1 and preserves CreateV2 metadata", async (t) => {
+  const h = scannerHarness(t, { "version-one-create": createdV2Transaction() });
+  const result = await h.refresh({ limit: 80 });
+  const request = h.calls.find((call) => call.method === "getTransaction");
+  assert.equal(request.args[1].encoding, "jsonParsed");
+  assert.equal(request.args[1].maxSupportedTransactionVersion, 1);
+  assert.equal(result.launches, 1);
+  const saved = JSON.parse(h.db.prepare("SELECT text FROM signals").get().text);
+  assert.equal(saved.observation, "launch");
+  assert.equal(saved.launchingUser, WALLET);
+  assert.equal(saved.name, "Test Launch");
+  assert.equal(saved.image, "https://ipfs.io/ipfs/actual-launch-art");
+});
+
+test("missing metadata or non-HTTPS artwork keeps confirmed launch and unknown image", async (t) => {
+  for (const options of [{ metadataError: true }, { metadata: { description: "description", image_uri: "javascript:alert(1)" } }]) {
+    const h = scannerHarness(t, { create: createdV2Transaction() }, options);
+    assert.equal((await h.refresh()).launches, 1);
+    const saved = JSON.parse(h.db.prepare("SELECT text FROM signals").get().text);
+    assert.equal(saved.mint, PUMP_PROGRAM);
+    assert.equal(saved.image, null);
+    assert.equal(saved.analysis.matchedRoundTrips.length, 0);
+  }
+});
+
+test("unavailable or failed observations break matching without invented returns", async (t) => {
+  for (const options of [{ unavailable: null }, { unavailable: new Error("Temporary RPC error") }, { unavailable: transaction(), failedSignatures: ["missing"] }]) {
+    const h = scannerHarness(t, { exit: sell(), missing: options.unavailable, entry: transaction() }, options);
+    const result = await h.refresh({ limit: 80 });
+    assert.equal(result.unavailableTransactions, 1);
+    assert.equal(result.matchedRoundTrips, 0);
+    const saved = h.db.prepare("SELECT text FROM signals").all().map((row) => JSON.parse(row.text));
+    assert.equal(saved.length, 2);
+    assert.equal(saved.every((row) => row.analysis.matchedRoundTrips.length === 0), true);
+    assert.equal(saved.some((row) => row.analysis.signature === "missing"), false);
+    assert.match(h.events[0].at(-1), /1 unavailable\/failed transactions/);
+  }
+});
+
+test("failed refresh preserves earlier saved evidence and emits no empty-success event", async (t) => {
+  const h = scannerHarness(t, { missing: new Error("RPC access unavailable") });
+  const previous = JSON.stringify({ wallet: WALLET, observation: "launch", name: "Previously observed", analysis: { signature: "old" } });
+  h.db.prepare("INSERT INTO signals VALUES('old','owner','wallet',?,?,'2026-09-30','https://solscan.io/tx/old',0)").run(WALLET, previous);
+  await assert.rejects(h.refresh, /RPC access unavailable/);
+  assert.equal(h.db.prepare("SELECT text FROM signals WHERE id='old'").get().text, previous);
+  assert.equal(h.events.length, 0);
 });

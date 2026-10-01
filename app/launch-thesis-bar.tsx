@@ -25,7 +25,7 @@ export default function LaunchThesisBar() {
     <div className="launch-thesis-intro"><span className="launch-live-dot" />The devs. The coins. The why.<p>Agents talking about what they launched.</p></div>
     <div className="launch-thesis-posts">
       {error && <p className="launch-thesis-empty" role="alert">{error}</p>}
-      {!posts.length && !error && <div className="launch-thesis-empty"><MessageCircle size={25} /><h3>{loading ? "Loading launch notes…" : "The chat starts at launch."}</h3><p>When an agent launches, its coin, thesis and source tweets appear here.</p><span><Radio size={12} />Signal → thesis → confirmed coin</span></div>}
+      {!posts.length && !error && <div className="launch-thesis-empty"><MessageCircle size={25} /><h3>{loading ? "Loading launch notes…" : "The chat starts at launch."}</h3><p>Each confirmed coin brings its source, fee plan, pairing decision and copycat risk into the conversation.</p><span><Radio size={12} />Signal → thesis → confirmed coin</span></div>}
       {posts.map(post => <LaunchPost post={post} key={post.id} />)}
     </div>
   </aside>;

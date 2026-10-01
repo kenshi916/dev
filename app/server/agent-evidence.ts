@@ -1,8 +1,35 @@
 import { AppError, db, id, now, one, rows, setting, textValue } from "./core";
+import { PublicKey } from "@solana/web3.js";
+import { decisionReasonKeys, type DecisionReasons, type LaunchDecisions, type LaunchExecution } from "../launch-decisions";
 
 export const FRESH_SIGNAL_MS = 6 * 60 * 60 * 1000;
 const STUDY_WALLET = "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa";
 const normalize = (value: string) => value.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+
+export async function proposalExecution(owner: string, agentId: string): Promise<LaunchExecution> {
+  const session = await one("SELECT public_key FROM sessions WHERE owner=? AND agent_id=?", owner, agentId);
+  if (!session?.public_key) throw new AppError("Create this agent's dedicated wallet first.", 409);
+  const preferences = await setting(owner, "support");
+  let supportPlan: LaunchExecution["supportPlan"] = null;
+  try {
+    const treasury = new PublicKey(preferences?.treasury).toBase58();
+    const percentage = preferences?.percentage;
+    if (treasury !== session.public_key && Number.isInteger(percentage) && percentage >= 1 && percentage <= 99)
+      supportPlan = { treasury, treasuryShareBps: percentage * 100, creatorShareBps: (100 - percentage) * 100 };
+  } catch { /* Missing or invalid preferences cannot invent a fee recipient. */ }
+  return {
+    quoteAsset: "SOL", stockPair: null, feeMode: "standard_creator_fees", creator: session.public_key,
+    creatorShareBps: 10000, feeBasis: "creator_fee_only", supportSplit: "separate_onchain_setup_required",
+    supportPlan, cashback: false, holderRewards: false, artwork: "session_default",
+  };
+}
+
+function decisionReasons(input: unknown): DecisionReasons {
+  if (!input || typeof input !== "object" || Array.isArray(input) ||
+      Object.keys(input).some(key => !decisionReasonKeys.includes(key as typeof decisionReasonKeys[number])))
+    throw new AppError("Explain fee recipients, pairing, cashback, copycat risk, differentiation and skip conditions. Decision text cannot change launch settings.");
+  return Object.fromEntries(decisionReasonKeys.map(key => [key, textValue((input as any)[key], 350)])) as DecisionReasons;
+}
 
 export async function freshAgentSignals(owner: string, agentId: string) {
   const used: string[] = await setting(owner, "agent_sources_" + agentId, []);
@@ -37,6 +64,10 @@ export async function saveEvidenceProposal(owner: string, agentId: string, input
   });
   const active = await one("SELECT status FROM agents WHERE id=? AND owner=?", agentId, owner);
   if (active?.status !== "running") throw new AppError("The agent was stopped.");
+  const decisions: LaunchDecisions = {
+    version: 1, execution: await proposalExecution(owner, agentId), reasoning: decisionReasons(input.decisions),
+    copycatAssessment: { scope: "workspace_only", marketSearch: "not_performed", protection: "none" },
+  };
   const previous = await rows("SELECT name,symbol FROM drafts WHERE owner=?", owner);
   if (previous.some((draft) => normalize(draft.name) === normalize(name) || normalize(draft.symbol) === normalize(symbol)))
     throw new AppError("This name or ticker already exists in your workspace. Skip recycled concepts.");
@@ -54,7 +85,7 @@ export async function saveEvidenceProposal(owner: string, agentId: string, input
     db().prepare("INSERT INTO settings (owner,key,value) VALUES (?,?,?) ON CONFLICT(owner,key) DO UPDATE SET value=excluded.value")
       .bind(owner, "agent_sources_" + agentId, JSON.stringify(nextUsed)),
     db().prepare("INSERT INTO settings(owner,key,value) VALUES (?,?,?)")
-      .bind(owner, "launch_thesis_" + draftId, JSON.stringify({ summary, sources: sources.map(s => ({ kind: s.kind, author: s.source, text: s.kind === "tweet" ? s.text.slice(0, 280) : "Verified reference-wallet deployment", url: s.url })) })),
+      .bind(owner, "launch_thesis_" + draftId, JSON.stringify({ summary, decisions, sources: sources.map(s => ({ kind: s.kind, author: s.source, text: s.kind === "tweet" ? s.text.slice(0, 280) : "Verified reference-wallet deployment", url: s.url })) })),
   ]); } catch (error) {
     if (await setting(owner, "coin_name_" + normalize(name)) || await setting(owner, "coin_symbol_" + normalize(symbol)))
       throw new AppError("Another agent already claimed this name or ticker. Skip recycled concepts.", 409);

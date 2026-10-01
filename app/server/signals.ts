@@ -44,7 +44,8 @@ function launchInTransaction(value: unknown, wallet: string) {
   return null;
 }
 
-export async function refreshWallets(owner: string, onlyWallet?: string) {
+export async function refreshWallets(owner: string, onlyWallet?: string, options: { limit?: number } = {}) {
+  const limit = Math.max(12, Math.min(80, Math.floor(options.limit || 12)));
   const tracks = onlyWallet
     ? await rows("SELECT * FROM tracks WHERE owner=? AND kind='wallet' AND query=?", owner, onlyWallet)
     : await rows("SELECT * FROM tracks WHERE owner=? AND kind='wallet'", owner);
@@ -56,18 +57,18 @@ export async function refreshWallets(owner: string, onlyWallet?: string) {
       now(), track.id, owner, new Date(Date.now() - 120000).toISOString(),
     );
     if (!claim.meta.changes) continue;
-    const signatures = await rpc(owner, "getSignaturesForAddress", [track.query, { limit: 12, commitment: "confirmed" }]);
+    const signatures = await rpc(owner, "getSignaturesForAddress", [track.query, { limit, commitment: "confirmed" }]);
     if (!Array.isArray(signatures)) throw new AppError("Solana RPC returned an invalid wallet history.", 502);
     const samples: WalletSample[] = [];
     // Re-read the bounded contiguous window, including saved signatures, to avoid matching
     // across unknown history between refreshes or assuming transfers were purchases.
-    for (const value of signatures.slice(0, 12)) {
+    for (const value of signatures.slice(0, limit)) {
       const item = object(value);
       if (typeof item.signature !== "string") continue;
       if (item.err) { samples.push({ signature: item.signature, transaction: null }); continue; }
       let transaction: unknown = null;
       try {
-        transaction = await rpc(owner, "getTransaction", [item.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" }]);
+        transaction = await rpc(owner, "getTransaction", [item.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 1, commitment: "confirmed" }]);
       } catch (error) {
         // An unavailable RPC is an access problem, not an empty/profitable wallet history.
         if (!samples.some((sample) => sample.transaction)) throw error;
@@ -82,12 +83,13 @@ export async function refreshWallets(owner: string, onlyWallet?: string) {
       const tx = samples.find((sample) => sample.signature === analysis.signature)?.transaction;
       const launch = launchInTransaction(tx, track.query);
       if (!launch && !analysis.trade && analysis.native.changeLamports === "0" && !analysis.tokens.length) continue;
-      let description: string | null = null;
+      let description: string | null = null, image: string | null = null;
       if (launch) {
         try {
           const response = await external("https://frontend-api-v3.pump.fun/coins-v2/" + launch.mint, {}, "pump.fun");
           const coin = object(await response.json());
           description = typeof coin.description === "string" ? coin.description.slice(0, 600) : null;
+          image = typeof coin.image_uri === "string" && /^https:\/\//.test(coin.image_uri) ? coin.image_uri.slice(0, 1200) : null;
         } catch { /* On-chain evidence remains available without metadata. */ }
       }
       const observation = launch ? "launch" : analysis.kind;
@@ -98,6 +100,7 @@ export async function refreshWallets(owner: string, onlyWallet?: string) {
         name: launch?.name || (analysis.trade ? `${analysis.trade.protocol} ${analysis.trade.side}` : "Wallet balance change"),
         symbol: launch?.symbol || null,
         description: launch ? description || summary : summary,
+        image,
         mint: launch?.mint || analysis.trade?.mint || null,
         blockTime: analysis.blockTime,
         ...(launch ? { launchingUser: launch.launchingUser, declaredCreator: launch.declaredCreator } : {}),

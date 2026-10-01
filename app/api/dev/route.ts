@@ -336,7 +336,7 @@ export async function POST(request: Request) {
       }
       case "study_deploys": {
         const { studyDeploys } = await import("../../server/deploy-study");
-        result = await studyDeploys(owner);
+        result = await studyDeploys(owner, true, true);
         break;
       }
       case "configure_agent_wallet": {

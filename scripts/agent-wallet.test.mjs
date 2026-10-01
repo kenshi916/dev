@@ -8,6 +8,14 @@ import * as solana from "@solana/web3.js";
 import bs58 from "bs58";
 
 const root = new URL("../", import.meta.url);
+const decisions = {
+  feeRecipients: "The agent's creator-fee share can support its operation; treasury sharing needs separate setup.",
+  pairing: "SOL is the supported pair. A stock association is only a narrative idea.",
+  cashback: "Cashback is off. New cashback creation is deprecated; holder rewards are not integrated.",
+  vampRisk: "Other developers can copy the theme. Workspace checks are not a market search.",
+  differentiation: "This proposal refers to the cited community theme and reuses the configured artwork.",
+  skipConditions: "Skip if the source is stale or a stronger competing concept is observed.",
+};
 function load(path, dependencies) {
   const source = ts.transpileModule(readFileSync(new URL(path, root), "utf8"), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
@@ -57,10 +65,11 @@ function harness(t) {
     return { value: balance };
   };
   const avatars = load("app/agent-avatars.ts", {});
+  const decisionTypes = load("app/launch-decisions.ts", {});
   const accounting = load("app/server/coin-accounting.ts", { "@solana/web3.js": solana, bs58: { default: bs58 } });
   const wallet = load("app/server/agent-wallet.ts", { "../agent-avatars": avatars, "@solana/web3.js": solana, "./core": core,
     "./ai-access": { aiAccessStatus: async () => ({ available: ai }) } });
-  const evidence = load("app/server/agent-evidence.ts", { "./core": core });
+  const evidence = load("app/server/agent-evidence.ts", { "./core": core, "@solana/web3.js": solana, "../launch-decisions": decisionTypes });
   const input = { creationId: crypto.randomUUID(), name: "Fixture agent", model: "fixture/model",
     mission: "Skip weak ideas and explain observed themes.", recipient: solana.Keypair.generate().publicKey.toBase58(),
     maxSol: "0.05", perLaunch: "0.015", maxLaunches: "3" };
@@ -72,17 +81,18 @@ function harness(t) {
     sql.prepare("INSERT INTO signals(id,owner,kind,source,text,url,created_at) VALUES (?,?,'tweet','fixture','Public source',?,?)")
       .run(id, owner, url, new Date(Date.now() - age).toISOString());
   const runRoute = (respond, launched = () => {}) => {
-    core.external = async () => Response.json(await respond());
+    core.external = async (_url, options) => Response.json(await respond(JSON.parse(options.body)));
     return load("app/api/run/route.ts", {
       "../../server/core": core,
       "../../server/ai-access": { openRouterAccess: async () => ({ apiKey: "fixture-token" }) },
       "../../server/agent-evidence": evidence,
+      "../../launch-decisions": decisionTypes,
       "../../server/agent-wallet": wallet,
       "../../server/launch": { autoLaunch: async () => launched() },
       "../../server/deploy-study": { studyDeploys: async () => ({ deployments: [], refreshStatus: "Fixture observations" }) },
     });
   };
-  return { sql, core, wallet, evidence, avatars, accounting, input, ready, signal, runRoute, setBalance: value => { balance = value; }, failRpc: () => { rpcFails = true; }, disableAi: () => { ai = false; } };
+  return { sql, core, wallet, evidence, avatars, decisionTypes, accounting, input, ready, signal, runRoute, setBalance: value => { balance = value; }, failRpc: () => { rpcFails = true; }, disableAi: () => { ai = false; } };
 }
 
 test("wallet can be created before return address and configured only before activation", async t => {
@@ -125,7 +135,7 @@ test("concurrent agents cannot claim the same normalized coin name or ticker", a
   await h.wallet.createAgentWallet("owner-a", h.input); await h.wallet.createAgentWallet("owner-a", second);
   h.sql.exec("UPDATE agents SET status='running'"); h.signal("source");
   const signals = await h.evidence.freshAgentSignals("owner-a", h.input.creationId);
-  const proposal = { name: "A Fresh Theme", symbol: "FRESH", description: "Description", summary: "Summary", sourceIds: ["source"] };
+  const proposal = { name: "A Fresh Theme", symbol: "FRESH", description: "Description", summary: "Summary", sourceIds: ["source"], decisions };
   const results = await Promise.allSettled([h.evidence.saveEvidenceProposal("owner-a", h.input.creationId, proposal, signals), h.evidence.saveEvidenceProposal("owner-a", second.creationId, { ...proposal, name: "a fresh-theme" }, signals)]);
   assert.equal(results.filter(r => r.status === "fulfilled").length, 1);
   assert.equal(h.sql.prepare("SELECT count(*) AS n FROM drafts").get().n, 1);
@@ -149,7 +159,7 @@ test("public activity includes only public profiles and verified launches, with 
     h.sql.prepare("INSERT INTO drafts(id,owner,agent_id,name,symbol,description,rationale,status,mint,signature,created_at) VALUES (?,'owner-a',?,'Coin','COIN','Private description','Private thesis',?,'mint','signature',?)").run(status, h.input.creationId, status, new Date().toISOString());
     await h.core.setSetting("owner-a", "public_launch_" + status, { confirmedAt: new Date().toISOString() });
   }
-  const activity = load("app/server/public-activity.ts", { "./core": h.core, "../agent-avatars": h.avatars, "./coin-accounting": h.accounting });
+  const activity = load("app/server/public-activity.ts", { "./core": h.core, "../agent-avatars": h.avatars, "../launch-decisions": h.decisionTypes, "./coin-accounting": h.accounting });
   await h.core.setSetting("owner-a", "launch_thesis_launched", { summary: "I built this from the source theme.", owner: "must-not-leak", sources: [{ kind: "tweet", author: "source", text: "Public tweet", url: "https://x.com/source/status/123", secret: "must-not-leak" }, { kind: "tweet", url: "javascript:alert(1)" }] });
   const items = await activity.publicActivity();
   assert.equal(items.length, 2);
@@ -159,6 +169,7 @@ test("public activity includes only public profiles and verified launches, with 
   const coins = await activity.publicActivity("coin_launched");
   assert.equal(coins.length, 1); assert.equal(coins[0].thesis.sources.length, 1);
   assert.equal(coins[0].thesis.sources[0].url, "https://x.com/source/status/123");
+  assert.equal(coins[0].thesis.decisions, null);
 });
 
 test("public launch confirmation bypasses owner-controlled RPC and requires successful execution", async t => {
@@ -314,7 +325,7 @@ test("proposal consumes cited evidence atomically and blocks recycled names", as
   const h = harness(t); await h.wallet.createAgentWallet("owner-a", h.input);
   h.sql.exec("UPDATE agents SET status='running'"); h.signal("source1");
   const signals = await h.evidence.freshAgentSignals("owner-a", h.input.creationId);
-  const proposal = { name: "Fresh Theme", symbol: "FRESH", description: "A fixture concept", summary: "Observed source", sourceIds: ["source1"] };
+  const proposal = { name: "Fresh Theme", symbol: "FRESH", description: "A fixture concept", summary: "Observed source", sourceIds: ["source1"], decisions };
   const saved = await h.evidence.saveEvidenceProposal("owner-a", h.input.creationId, proposal, signals);
   assert(h.sql.prepare("SELECT rationale FROM drafts WHERE id=?").get(saved.id).rationale.includes("https://x.com/fixture/status/source1"));
   assert.equal((await h.evidence.freshAgentSignals("owner-a", h.input.creationId)).length, 0);
@@ -327,7 +338,7 @@ test("failed insert does not consume evidence or announce a saved proposal", asy
   h.sql.exec("UPDATE agents SET status='running'"); h.signal("source");
   h.sql.exec("CREATE TRIGGER reject_draft BEFORE INSERT ON drafts BEGIN SELECT RAISE(ABORT, 'fixture failure'); END");
   const signals = await h.evidence.freshAgentSignals("owner-a", h.input.creationId);
-  await assert.rejects(h.evidence.saveEvidenceProposal("owner-a", h.input.creationId, { name: "Theme", symbol: "THEME", description: "Description", summary: "Summary", sourceIds: ["source"] }, signals), /fixture failure/);
+  await assert.rejects(h.evidence.saveEvidenceProposal("owner-a", h.input.creationId, { name: "Theme", symbol: "THEME", description: "Description", summary: "Summary", sourceIds: ["source"], decisions }, signals), /fixture failure/);
   assert.equal((await h.evidence.freshAgentSignals("owner-a", h.input.creationId)).length, 1);
   assert.equal(h.sql.prepare("SELECT count(*) AS n FROM drafts").get().n, 0);
 });
@@ -368,9 +379,16 @@ test("an activated run studies deploys, cites a tweet and saves its public launc
   await h.wallet.toggleAgentWallet("owner-a", h.input.creationId, true); h.signal("fresh-source");
   let calls = 0, launches = 0;
   const call = (name, args = {}) => ({ id: name, function: { name, arguments: JSON.stringify(args) } });
-  const route = h.runRoute(() => ({ choices: [{ message: { tool_calls: ++calls === 1
+  const route = h.runRoute(request => {
+    const trusted = request.messages.find(m => m.role === "system" && m.content.startsWith("Trusted creation configuration:"));
+    assert(trusted.content.includes('"quoteAsset":"SOL"'));
+    assert(trusted.content.includes('"supportPlan":null'));
+    assert(trusted.content.includes("cashback creation is deprecated"));
+    assert(!trusted.content.includes(h.input.recipient));
+    return { choices: [{ message: { tool_calls: ++calls === 1
     ? [call("read_deploy_study"), call("read_signals")]
-    : [call("save_proposal", { name: "River Study", symbol: "RIVER", description: "A fixture concept grounded in a public source.", summary: "I built River Study from the source's community theme.", sourceIds: ["fresh-source"] })] } }] }), () => { launches++; });
+    : [call("save_proposal", { name: "River Study", symbol: "RIVER", description: "A fixture concept grounded in a public source.", summary: "I built River Study from the source's community theme.", sourceIds: ["fresh-source"], decisions })] } }] };
+  }, () => { launches++; });
   const response = await route.POST(runRequest(h.input.creationId));
   const output = await response.text();
   assert(!output.includes('"error"')); assert(output.includes('"research"'));
@@ -379,5 +397,77 @@ test("an activated run studies deploys, cites a tweet and saves its public launc
   const note = await h.core.setting("owner-a", "launch_thesis_" + draft.id);
   assert.equal(note.summary, "I built River Study from the source's community theme.");
   assert.equal(note.sources[0].url, "https://x.com/fixture/status/fresh-source");
+  assert.deepEqual(JSON.parse(JSON.stringify(note.decisions.reasoning)), decisions);
+  assert.equal(note.decisions.execution.creator, h.sql.prepare("SELECT public_key FROM sessions").get().public_key);
+  assert.equal(note.decisions.execution.supportPlan, null);
   assert.equal(await h.core.setting("owner-a", "public_launch_" + draft.id), null);
+});
+
+test("new thesis requires bounded explanations and never accepts model-supplied execution settings", async t => {
+  const h = harness(t); await h.wallet.createAgentWallet("owner-a", h.input);
+  h.sql.exec("UPDATE agents SET status='running'"); h.signal("decision-source");
+  const signals = await h.evidence.freshAgentSignals("owner-a", h.input.creationId);
+  const proposal = { name: "Decision Fixture", symbol: "DECIDE", description: "Fixture", summary: "Public fixture", sourceIds: ["decision-source"] };
+  for (const bad of [undefined, {}, { ...decisions, pairing: "" }, { ...decisions, vampRisk: "x".repeat(351) }, { ...decisions, treasury: h.input.recipient }]) {
+    await assert.rejects(h.evidence.saveEvidenceProposal("owner-a", h.input.creationId, { ...proposal, decisions: bad }, signals));
+    assert.equal(h.sql.prepare("SELECT count(*) AS n FROM drafts").get().n, 0);
+    assert.equal((await h.evidence.freshAgentSignals("owner-a", h.input.creationId)).length, 1);
+  }
+  const saved = await h.evidence.saveEvidenceProposal("owner-a", h.input.creationId, {
+    ...proposal, decisions, execution: { quoteAsset: "STOCK", cashback: true, creator: h.input.recipient },
+  }, signals);
+  const note = await h.core.setting("owner-a", "launch_thesis_" + saved.id);
+  assert.equal(note.decisions.execution.quoteAsset, "SOL");
+  assert.equal(note.decisions.execution.cashback, false);
+  assert.notEqual(note.decisions.execution.creator, h.input.recipient);
+  assert.equal(note.decisions.execution.artwork, "session_default");
+  assert.equal(note.decisions.copycatAssessment.marketSearch, "not_performed");
+});
+
+test("configured treasury is a future creator-fee plan, never an applied split or a return-wallet fallback", async t => {
+  const h = harness(t); const agent = await h.wallet.createAgentWallet("owner-a", h.input);
+  for (const preference of [null, {}, { treasury: "invalid", percentage: 20 }, { treasury: h.input.recipient, percentage: 100 }, { treasury: agent.publicKey, percentage: 20 }]) {
+    await h.core.setSetting("owner-a", "support", preference);
+    const execution = await h.evidence.proposalExecution("owner-a", h.input.creationId);
+    assert.equal(execution.supportPlan, null);
+    assert.equal(execution.creatorShareBps, 10000);
+  }
+  const treasury = solana.Keypair.generate().publicKey.toBase58();
+  await h.core.setSetting("owner-a", "support", { treasury, percentage: 20, mint: "not-a-stock-pair", privateNote: "do-not-publish" });
+  const execution = await h.evidence.proposalExecution("owner-a", h.input.creationId);
+  assert.equal(execution.supportPlan.treasury, treasury);
+  assert.equal(execution.supportPlan.treasuryShareBps, 2000);
+  assert.equal(execution.supportPlan.creatorShareBps, 8000);
+  assert.equal(execution.creatorShareBps, 10000);
+  assert.equal(execution.feeBasis, "creator_fee_only");
+  assert.equal(execution.supportSplit, "separate_onchain_setup_required");
+  assert.equal(execution.stockPair, null);
+  assert(!JSON.stringify(execution).includes(h.input.recipient));
+  assert(!JSON.stringify(execution).includes("privateNote"));
+});
+
+test("public decision projection requires the confirmed creator and strips nonpublic or unsupported fields", async t => {
+  const h = harness(t); const agent = await h.wallet.createAgentWallet("owner-a", h.input);
+  const execution = await h.evidence.proposalExecution("owner-a", h.input.creationId);
+  const value = { version: 1, execution: { ...execution, private_key: "must-not-leak" },
+    reasoning: { ...decisions, privateMission: "must-not-leak" }, copycatAssessment: { marketSearch: "exhaustive", protection: "guaranteed" }, owner: "must-not-leak" };
+  const project = h.decisionTypes.publicLaunchDecisions;
+  const result = project(value, agent.publicKey);
+  assert(result); assert(!JSON.stringify(result).includes("must-not-leak"));
+  assert.equal(result.copycatAssessment.marketSearch, "not_performed");
+  assert.equal(result.copycatAssessment.protection, "none");
+  assert.equal(project(value, h.input.recipient), null);
+  assert.equal(project({ ...value, execution: { ...execution, cashback: true } }, agent.publicKey), null);
+  assert.equal(project({ ...value, execution: { ...execution, quoteAsset: "STOCK" } }, agent.publicKey), null);
+
+  h.sql.prepare("INSERT INTO drafts(id,owner,agent_id,name,symbol,description,rationale,status,mint,signature,created_at) VALUES ('public-decisions','owner-a',?,'Coin','COIN','','','launched','mint','signature',?)")
+    .run(h.input.creationId, new Date().toISOString());
+  await h.core.setSetting("owner-a", "launch_thesis_public-decisions", { summary: "Public note", sources: [], decisions: value });
+  const activity = load("app/server/public-activity.ts", { "./core": h.core, "../agent-avatars": h.avatars, "../launch-decisions": h.decisionTypes, "./coin-accounting": h.accounting });
+  await h.core.setSetting("owner-a", "public_launch_public-decisions", { confirmedAt: new Date().toISOString(), creator: agent.publicKey, verification: "owner-rpc" });
+  assert.equal((await activity.publicActivity("coin_launched"))[0].thesis.decisions, null);
+  await h.core.setSetting("owner-a", "public_launch_public-decisions", { confirmedAt: new Date().toISOString(), creator: agent.publicKey, verification: "server-rpc" });
+  assert.equal((await activity.publicActivity("coin_launched"))[0].thesis.decisions, null);
+  await h.core.setSetting("owner-a", "public_launch_public-decisions", { confirmedAt: new Date().toISOString(), creator: agent.publicKey, verification: "server-rpc", launchDebitLamports: 1234 });
+  assert.equal((await activity.publicActivity("coin_launched"))[0].thesis.decisions.execution.creator, agent.publicKey);
 });

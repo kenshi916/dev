@@ -1,0 +1,225 @@
+{
+  "fetchedAt": "2026-10-01T12:47:48.015Z",
+  "wallet": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+  "source": "Direct read-only official Solana mainnet RPC. Successful confirmed transactions; transaction-version 1 parsed reads enabled.",
+  "scope": "Five selected transactions from a bounded recent wallet-address sample. This is not complete wallet history, lifetime PNL, or complete per-coin profit.",
+  "deployment": {
+    "name": "robotics coin",
+    "symbol": "robotics",
+    "mint": "2EjmSFMJAoDWY8KDTX8fX8UE7xynccsQbjXoagn16uMp",
+    "dateUtc": "2026-10-01T03:32:36.000Z",
+    "dateLosAngeles": "2026-09-30T20:32:36-07:00",
+    "launchingUser": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+    "declaredCreator": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+    "metadataUri": "https://md.sdfgsdfsdf.uk/metadata/zVQW9q9G",
+    "metadataStatus": "Fetch failed; source tweet, artwork, and off-chain timing unverified.",
+    "boughtTokenRaw": "151660777334045",
+    "tokenDecimals": 6,
+    "launchAndBuyDebitLamports": 5009434080,
+    "sellNetCreditsLamports": [
+      1784462414,
+      3112330258
+    ],
+    "observedLaunchTradeCashflowLamports": -112641408,
+    "interveningSetupDebitLamports": 7989240,
+    "observedCashflowIncludingSetupLamports": -120630648,
+    "holdingSeconds": 6,
+    "remainingTokensOnObservedAccount": "0",
+    "cashflowNote": "Wallet net balance deltas already include network fees and tips; do not subtract fees a second time. Negative cash flow is observed for these transactions only. No aggregate creator-vault collections allocated to this mint; service costs and other activity are outside the sample."
+  },
+  "creatorFeeCollection": {
+    "dateUtc": "2026-10-01T03:32:54.000Z",
+    "creatorVault": "Di45LoeGsbTCrujHQWP4zT95C69XW8rZU3U7Ztg1JqQL",
+    "expectedCreatorVault": "Di45LoeGsbTCrujHQWP4zT95C69XW8rZU3U7Ztg1JqQL",
+    "creatorVaultMatches": true,
+    "verifiedNativeCreatorVaultTransferLamports": 29950879,
+    "walletNetDeltaLamports": 31434319,
+    "networkFeeLamports": 5000,
+    "closedWrappedSolAccountRefundLamports": 1488440,
+    "scope": "Aggregate creator vault payment across unspecified eligible coins. Includes no verified per-mint allocation. Wallet delta also contains a token-account rent refund; it is not all fee income."
+  },
+  "learning": {
+    "observed": [
+      "CreateV2 and initial BuyExactSolIn in one transaction.",
+      "Two subsequent sells fully exited the observed token position within six seconds; its account remained open.",
+      "This fast example had negative observed launch/trade cash flow.",
+      "Fee configuration followed the creation by one second."
+    ],
+    "unverified": [
+      "Exact source tweet and tweet-to-launch latency.",
+      "Whether this was the earliest or most recognizable competing launch.",
+      "Why traders chose this name or image.",
+      "Lifetime earnings, total creator fees, and the user screenshot total PNL."
+    ],
+    "candidateTests": [
+      "Measure actual tweet arrival-to-confirmation latency, source-image match, and duplicate launch timing.",
+      "Compare successful and unsuccessful launches across a complete fixed window.",
+      "Attribute creator fees by mint and separate trading cash flow, rent refunds, transfers, and failed transaction costs."
+    ]
+  },
+  "observations": [
+    {
+      "label": "create",
+      "signature": "oALbki7Vg6jXQWaNSPtzTDfhYY59LR3294beL5AqhhHitd54FwoYZGvDx9ihSEvWtsiNh9o2q3C8pyDey4e3vMH",
+      "fetchedAt": "2026-10-01T12:47:40.976Z",
+      "file": "create.json",
+      "sha256": "f905e716f774fb4d26e1c471681eac65da0935c74437c1e0083f6312326202df",
+      "sourceUrl": "https://solscan.io/tx/oALbki7Vg6jXQWaNSPtzTDfhYY59LR3294beL5AqhhHitd54FwoYZGvDx9ihSEvWtsiNh9o2q3C8pyDey4e3vMH",
+      "blockTime": 1790825556,
+      "dateUtc": "2026-10-01T03:32:36.000Z",
+      "version": 1,
+      "error": null,
+      "walletSigner": true,
+      "walletDeltaLamports": -5009434080,
+      "networkFeeLamports": 1010000,
+      "ownedTokensBefore": [],
+      "ownedTokensAfter": [
+        {
+          "accountIndex": 9,
+          "mint": "2EjmSFMJAoDWY8KDTX8fX8UE7xynccsQbjXoagn16uMp",
+          "owner": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+          "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "uiTokenAmount": {
+            "amount": "151660777334045",
+            "decimals": 6,
+            "uiAmount": 151660777.334045,
+            "uiAmountString": "151660777.334045"
+          }
+        }
+      ]
+    },
+    {
+      "label": "fee-setup",
+      "signature": "27wbbnbiDnbv3kmW6kvGvJ5sgfa4nXmxf9NZe3XU62acMXKQ8X2E9tinq4n45pGeFjYCrysjayTW3PWPdzdKoTFb",
+      "fetchedAt": "2026-10-01T12:47:42.725Z",
+      "file": "fee-setup.json",
+      "sha256": "0bb190632766df40cf9261212660d9b2e35949d31e90cb71434deec4bc4ffddc",
+      "sourceUrl": "https://solscan.io/tx/27wbbnbiDnbv3kmW6kvGvJ5sgfa4nXmxf9NZe3XU62acMXKQ8X2E9tinq4n45pGeFjYCrysjayTW3PWPdzdKoTFb",
+      "blockTime": 1790825557,
+      "dateUtc": "2026-10-01T03:32:37.000Z",
+      "version": 1,
+      "error": null,
+      "walletSigner": true,
+      "walletDeltaLamports": -7989240,
+      "networkFeeLamports": 1005000,
+      "ownedTokensBefore": [],
+      "ownedTokensAfter": []
+    },
+    {
+      "label": "sell-one",
+      "signature": "5QKCFMDw8yA6GbjDsPXqCw66vzMRuAzbqSJE7nZtTFqTYdzdcP9yYsSXU8ryr2dorGkEMzSCj5A455H11SMK4WxZ",
+      "fetchedAt": "2026-10-01T12:47:44.536Z",
+      "file": "sell-one.json",
+      "sha256": "d497a98ad91b7933e783fe22863716e08885787b26fe4e882bb1bb9d3bc840f2",
+      "sourceUrl": "https://solscan.io/tx/5QKCFMDw8yA6GbjDsPXqCw66vzMRuAzbqSJE7nZtTFqTYdzdcP9yYsSXU8ryr2dorGkEMzSCj5A455H11SMK4WxZ",
+      "blockTime": 1790825558,
+      "dateUtc": "2026-10-01T03:32:38.000Z",
+      "version": "legacy",
+      "error": null,
+      "walletSigner": true,
+      "walletDeltaLamports": 1784462414,
+      "networkFeeLamports": 1005000,
+      "ownedTokensBefore": [
+        {
+          "accountIndex": 3,
+          "mint": "2EjmSFMJAoDWY8KDTX8fX8UE7xynccsQbjXoagn16uMp",
+          "owner": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+          "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "uiTokenAmount": {
+            "amount": "151660777334045",
+            "decimals": 6,
+            "uiAmount": 151660777.334045,
+            "uiAmountString": "151660777.334045"
+          }
+        }
+      ],
+      "ownedTokensAfter": [
+        {
+          "accountIndex": 3,
+          "mint": "2EjmSFMJAoDWY8KDTX8fX8UE7xynccsQbjXoagn16uMp",
+          "owner": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+          "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "uiTokenAmount": {
+            "amount": "101612720813811",
+            "decimals": 6,
+            "uiAmount": 101612720.813811,
+            "uiAmountString": "101612720.813811"
+          }
+        }
+      ]
+    },
+    {
+      "label": "sell-two",
+      "signature": "3XAqYn3zZis7TM77MEtdkZGRCbH32ayLBiKTKDTCALAKHRy9JBnvjbskSvsrkqwF11A1doswvom5SFeUiUyQHXjP",
+      "fetchedAt": "2026-10-01T12:47:46.286Z",
+      "file": "sell-two.json",
+      "sha256": "7cbc951c97a075b38ed7afe2465f47a8537830745990345396578592e2b9192c",
+      "sourceUrl": "https://solscan.io/tx/3XAqYn3zZis7TM77MEtdkZGRCbH32ayLBiKTKDTCALAKHRy9JBnvjbskSvsrkqwF11A1doswvom5SFeUiUyQHXjP",
+      "blockTime": 1790825562,
+      "dateUtc": "2026-10-01T03:32:42.000Z",
+      "version": "legacy",
+      "error": null,
+      "walletSigner": true,
+      "walletDeltaLamports": 3112330258,
+      "networkFeeLamports": 1005000,
+      "ownedTokensBefore": [
+        {
+          "accountIndex": 3,
+          "mint": "2EjmSFMJAoDWY8KDTX8fX8UE7xynccsQbjXoagn16uMp",
+          "owner": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+          "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "uiTokenAmount": {
+            "amount": "101612720813811",
+            "decimals": 6,
+            "uiAmount": 101612720.813811,
+            "uiAmountString": "101612720.813811"
+          }
+        }
+      ],
+      "ownedTokensAfter": [
+        {
+          "accountIndex": 3,
+          "mint": "2EjmSFMJAoDWY8KDTX8fX8UE7xynccsQbjXoagn16uMp",
+          "owner": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+          "programId": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "uiTokenAmount": {
+            "amount": "0",
+            "decimals": 6,
+            "uiAmount": null,
+            "uiAmountString": "0"
+          }
+        }
+      ]
+    },
+    {
+      "label": "aggregate-fee-collection",
+      "signature": "5u4BRVDidunFKMpuf5R8XmHF7zi3dZ3LpYYSzekkH9P2fPoGmSXyL3FusnrSRbSv22MqixR5AWPCfcjKwpiiJJTg",
+      "fetchedAt": "2026-10-01T12:47:48.012Z",
+      "file": "aggregate-fee-collection.json",
+      "sha256": "ac61b2906a3c3f401f8887ad2ac4e7445dc8c31ee7ffd39ae567657b5aa52c91",
+      "sourceUrl": "https://solscan.io/tx/5u4BRVDidunFKMpuf5R8XmHF7zi3dZ3LpYYSzekkH9P2fPoGmSXyL3FusnrSRbSv22MqixR5AWPCfcjKwpiiJJTg",
+      "blockTime": 1790825574,
+      "dateUtc": "2026-10-01T03:32:54.000Z",
+      "version": "legacy",
+      "error": null,
+      "walletSigner": true,
+      "walletDeltaLamports": 31434319,
+      "networkFeeLamports": 5000,
+      "ownedTokensBefore": [
+        {
+          "accountIndex": 3,
+          "mint": "So11111111111111111111111111111111111111112",
+          "owner": "bwamJzztZsepfkteWRChggmXuiiCQvpLqPietdNfSXa",
+          "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "uiTokenAmount": {
+            "amount": "0",
+            "decimals": 9,
+            "uiAmount": null,
+            "uiAmountString": "0"
+          }
+        }
+      ],
+      "ownedTokensAfter": []
+    }
+  ]
+}
