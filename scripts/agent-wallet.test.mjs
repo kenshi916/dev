@@ -5,6 +5,7 @@ import test from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
 import * as solana from "@solana/web3.js";
+import bs58 from "bs58";
 
 const root = new URL("../", import.meta.url);
 function load(path, dependencies) {
@@ -55,7 +56,9 @@ function harness(t) {
     if (rpcFails) throw new Error("unavailable");
     return { value: balance };
   };
-  const wallet = load("app/server/agent-wallet.ts", { "@solana/web3.js": solana, "./core": core,
+  const avatars = load("app/agent-avatars.ts", {});
+  const accounting = load("app/server/coin-accounting.ts", { "@solana/web3.js": solana, bs58: { default: bs58 } });
+  const wallet = load("app/server/agent-wallet.ts", { "../agent-avatars": avatars, "@solana/web3.js": solana, "./core": core,
     "./ai-access": { aiAccessStatus: async () => ({ available: ai }) } });
   const evidence = load("app/server/agent-evidence.ts", { "./core": core });
   const input = { creationId: crypto.randomUUID(), name: "Fixture agent", model: "fixture/model",
@@ -79,7 +82,7 @@ function harness(t) {
       "../../server/deploy-study": { studyDeploys: async () => ({ deployments: [], refreshStatus: "Fixture observations" }) },
     });
   };
-  return { sql, core, wallet, evidence, input, ready, signal, runRoute, setBalance: value => { balance = value; }, failRpc: () => { rpcFails = true; }, disableAi: () => { ai = false; } };
+  return { sql, core, wallet, evidence, avatars, accounting, input, ready, signal, runRoute, setBalance: value => { balance = value; }, failRpc: () => { rpcFails = true; }, disableAi: () => { ai = false; } };
 }
 
 test("wallet can be created before return address and configured only before activation", async t => {
@@ -111,7 +114,7 @@ test("a newer pause supersedes activation waiting for RPC", async t => {
 test("retirement without a return address leaves setup configurable", async t => {
   const h = harness(t);
   await h.wallet.createAgentWallet("owner-a", { ...h.input, recipient: "" });
-  const launch = load("app/server/launch.ts", { "@solana/web3.js": solana, "@pump-fun/pump-sdk": {}, "./limits": {}, "./core": h.core });
+  const launch = load("app/server/launch.ts", { "@solana/web3.js": solana, "@pump-fun/pump-sdk": {}, "./limits": {}, "./core": h.core, "./coin-accounting": h.accounting });
   await assert.rejects(launch.withdrawSession("owner-a", h.input.creationId), /return address/);
   assert.equal(h.sql.prepare("SELECT expires_at FROM sessions").get().expires_at, h.wallet.SETUP_EXPIRY);
   await h.wallet.configureAgentWallet("owner-a", h.input.creationId, h.input);
@@ -146,7 +149,7 @@ test("public activity includes only public profiles and verified launches, with 
     h.sql.prepare("INSERT INTO drafts(id,owner,agent_id,name,symbol,description,rationale,status,mint,signature,created_at) VALUES (?,'owner-a',?,'Coin','COIN','Private description','Private thesis',?,'mint','signature',?)").run(status, h.input.creationId, status, new Date().toISOString());
     await h.core.setSetting("owner-a", "public_launch_" + status, { confirmedAt: new Date().toISOString() });
   }
-  const activity = load("app/server/public-activity.ts", { "./core": h.core });
+  const activity = load("app/server/public-activity.ts", { "./core": h.core, "../agent-avatars": h.avatars, "./coin-accounting": h.accounting });
   await h.core.setSetting("owner-a", "launch_thesis_launched", { summary: "I built this from the source theme.", owner: "must-not-leak", sources: [{ kind: "tweet", author: "source", text: "Public tweet", url: "https://x.com/source/status/123", secret: "must-not-leak" }, { kind: "tweet", url: "javascript:alert(1)" }] });
   const items = await activity.publicActivity();
   assert.equal(items.length, 2);
@@ -164,15 +167,74 @@ test("public launch confirmation bypasses owner-controlled RPC and requires succ
   let trustedCalls = 0, tx = null;
   h.core.rpc = async () => { throw new Error("Owner-controlled RPC must not be used"); };
   h.core.publicLaunchTransaction = async () => { trustedCalls++; return tx; };
-  const launch = load("app/server/launch.ts", { "@solana/web3.js": solana, "@pump-fun/pump-sdk": {}, "./limits": {}, "./core": h.core });
+  const launch = load("app/server/launch.ts", { "@solana/web3.js": solana, "@pump-fun/pump-sdk": {}, "./limits": {}, "./core": h.core, "./coin-accounting": h.accounting });
   assert.equal((await launch.confirmLaunch("owner-a", "coin")).status, "submitted");
   tx = { meta: { logMessages: ["Program log: Instruction: CreateV2"] }, transaction: { message: { instructions: [{ programId: "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P", accounts: ["mint"] }], accountKeys: [{ pubkey: "payer", signer: true }] } } };
   await assert.rejects(launch.confirmLaunch("owner-a", "coin"), /execution/);
   assert.equal(await h.core.setting("owner-a", "public_launch_coin"), null);
   tx.meta.err = null;
   assert.equal((await launch.confirmLaunch("owner-a", "coin")).status, "launched");
-  assert.equal(trustedCalls, 3);
+  assert.equal(trustedCalls, 4);
   assert(await h.core.setting("owner-a", "public_launch_coin"));
+});
+
+test("public launch costs backfill from the exact signed transaction and survive later missing RPC data", async t => {
+  const h = harness(t); await h.wallet.createAgentWallet("owner-a", h.input);
+  const payer = solana.Keypair.generate(), mint = solana.Keypair.generate().publicKey;
+  const programId = new solana.PublicKey("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P");
+  // This offline fixture is never submitted; both RPC encodings describe its same signed message.
+  const transaction = new solana.VersionedTransaction(new solana.TransactionMessage({
+    payerKey: payer.publicKey,
+    recentBlockhash: solana.Keypair.generate().publicKey.toBase58(),
+    instructions: [new solana.TransactionInstruction({ programId,
+      keys: [{ pubkey: mint, isSigner: false, isWritable: true }], data: Buffer.from([1]) })],
+  }).compileToV0Message());
+  const preparedTransaction = Buffer.from(transaction.serialize()).toString("base64");
+  transaction.sign([payer]);
+  const signature = bs58.encode(transaction.signatures[0]);
+  h.sql.prepare("INSERT INTO drafts(id,owner,agent_id,name,symbol,description,rationale,status,mint,signature,prepared,created_at) VALUES ('cost-coin','owner-a',?,'Cost Coin','COST','','','submitted',?,?,?,?)")
+    .run(h.input.creationId, mint.toBase58(), signature, JSON.stringify({
+      wallet: payer.publicKey.toBase58(), transaction: preparedTransaction,
+    }), new Date().toISOString());
+  const parsed = {
+    blockTime: 1_700_000_000,
+    meta: { err: null, logMessages: ["Program log: Instruction: CreateV2"] },
+    transaction: { message: {
+      instructions: [{ programId: programId.toBase58(), accounts: [mint.toBase58()] }],
+      accountKeys: [{ pubkey: payer.publicKey.toBase58(), signer: true }],
+    } },
+  };
+  const actualDebit = 12_345_678;
+  const raw = {
+    transaction: [Buffer.from(transaction.serialize()).toString("base64"), "base64"],
+    meta: { err: null, preBalances: [100_000_000], postBalances: [100_000_000 - actualDebit] },
+  };
+  let rawAvailable = false;
+  h.core.rpc = async () => { throw new Error("Owner-controlled RPC must not be used"); };
+  h.core.publicLaunchTransaction = async (requestedSignature, encoding = "jsonParsed") => {
+    assert.equal(requestedSignature, signature);
+    return encoding === "base64" ? (rawAvailable ? raw : null) : parsed;
+  };
+  const launch = load("app/server/launch.ts", { "@solana/web3.js": solana, "@pump-fun/pump-sdk": {}, "./limits": {}, "./core": h.core, "./coin-accounting": h.accounting });
+  const snapshot = () => h.core.setting("owner-a", "public_launch_cost-coin");
+
+  assert.equal((await launch.confirmLaunch("owner-a", "cost-coin")).status, "launched");
+  const initial = await snapshot();
+  assert.equal(initial.launchDebitLamports, null);
+  assert.equal(initial.verification, "server-rpc");
+
+  rawAvailable = true;
+  assert.equal((await launch.confirmLaunch("owner-a", "cost-coin")).status, "launched");
+  const backfilled = await snapshot();
+  assert.equal(backfilled.launchDebitLamports, actualDebit);
+  assert.equal(backfilled.signature, signature);
+  assert.equal(backfilled.mint, mint.toBase58());
+  assert.equal(backfilled.confirmedAt, initial.confirmedAt);
+
+  rawAvailable = false;
+  assert.equal((await launch.confirmLaunch("owner-a", "cost-coin")).status, "launched");
+  assert.deepEqual(await snapshot(), backfilled);
+  assert.equal(h.sql.prepare("SELECT count(*) AS n FROM events WHERE kind='launch'").get().n, 1);
 });
 
 test("concurrent creation creates exactly one encrypted, disabled wallet without artwork", async t => {
@@ -184,6 +246,27 @@ test("concurrent creation creates exactly one encrypted, disabled wallet without
   assert.equal(row.enabled, 0); assert.equal(row.expires_at, h.wallet.SETUP_EXPIRY);
   assert.equal(row.image_url, null); assert.match(row.private_key, /^[^.]+\.[^.]+$/);
   assert.equal(row.recipient, h.input.recipient);
+});
+test("avatar choice persists atomically and cannot change through creation retries", async t => {
+  const h = harness(t);
+  const results = await Promise.allSettled([
+    h.wallet.createAgentWallet("owner-a", { ...h.input, avatar: "patch" }),
+    h.wallet.createAgentWallet("owner-a", { ...h.input, avatar: "glitch" }),
+  ]);
+  assert.equal(results.filter(r => r.status === "fulfilled").length, 1);
+  const winner = results.find(r => r.status === "fulfilled").value;
+  const stored = await h.core.setting("owner-a", "public_agent_" + h.input.creationId);
+  assert.equal(stored.avatar, winner.avatar);
+  const retried = await h.wallet.createAgentWallet("owner-a", { ...h.input, avatar: stored.avatar });
+  assert.equal(retried.publicKey, winner.publicKey);
+  assert.equal(h.sql.prepare("SELECT count(*) AS n FROM sessions").get().n, 1);
+  assert.equal(h.avatars.agentAvatarId("https://example.test/image.png"), "byte");
+});
+test("unknown avatar paths are rejected without creating an agent or wallet", async t => {
+  const h = harness(t);
+  for (const avatar of ["../../secret", "https://example.test/image.png", "", null])
+    await assert.rejects(h.wallet.createAgentWallet("owner-a", { ...h.input, avatar }), /available agent avatars/);
+  assert.equal(h.sql.prepare("SELECT count(*) AS n FROM agents").get().n, 0);
 });
 test("invalid limits or recipient cannot leave a partial agent", async t => {
   const h = harness(t);

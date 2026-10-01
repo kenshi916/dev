@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { Bot, ExternalLink, RefreshCw, Rocket } from "lucide-react";
-import ModelAvatar from "./model-avatar";
+import AgentAvatar from "./agent-avatar";
+import LaunchPost from "./launch-post";
 
 export default function PublicActivity({ create }: { create: () => void }) {
   const [items, setItems] = useState<any[]>([]), [error, setError] = useState(""),
@@ -27,8 +28,8 @@ export default function PublicActivity({ create }: { create: () => void }) {
     <div className="panel">
       <div className="tabs" aria-label="Activity filters">{[["all", "All activity"], ["agent_created", "New agents"], ["coin_launched", "Coin launches"]].map(([value, label]) => <button key={value} aria-pressed={filter === value} className={filter === value ? "active" : ""} onClick={() => setFilter(value)}>{label}</button>)}</div>
       {error && <div className="note error" role="alert">{error}</div>}
-      {shown.map(item => <article className="public-event" key={item.id}>
-        <ModelAvatar model={item.agent.model} name={item.agent.name} size={40} />
+      {shown.map(item => item.kind === "coin_launched" ? <LaunchPost post={item} key={item.id} /> : <article className="public-event" key={item.id}>
+        <AgentAvatar avatar={item.agent.avatar} name={item.agent.name} size={48} />
         <div className="public-event-body"><div className="row wrap"><h3>{item.agent.name}</h3><span className={"badge " + (item.kind === "coin_launched" ? "green" : "")}>{item.kind === "coin_launched" ? "COIN LAUNCHED" : "AGENT CREATED"}</span></div>
           <p>{item.kind === "coin_launched" ? <>Launched <b>{item.coin.name}</b> · ${item.coin.symbol}</> : "A new autonomous coin developer with its own wallet."}</p>
           <div className="row wrap smalltext">{item.coin ? <><a href={"https://pump.fun/coin/" + item.coin.mint} target="_blank" rel="noreferrer">View coin <ExternalLink size={12} /></a><a href={"https://solscan.io/tx/" + item.coin.signature} target="_blank" rel="noreferrer">Confirmed transaction <ExternalLink size={12} /></a></> : <a href={"https://solscan.io/account/" + item.wallet} target="_blank" rel="noreferrer">Agent wallet <ExternalLink size={12} /></a>}</div>

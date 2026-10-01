@@ -1,6 +1,7 @@
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { AppError, change, db, encrypt, event, id, now, one, rows, rpc, setSetting, setting, textValue } from "./core";
 import { aiAccessStatus } from "./ai-access";
+import { agentAvatarId, isAgentAvatar } from "../agent-avatars";
 
 // Disabled setup wallets have no running authorization window yet.
 export const SETUP_EXPIRY = "1970-01-01T00:00:00.000Z";
@@ -37,14 +38,17 @@ export async function createAgentWallet(owner: string, input: any) {
   const agentId = textValue(input.creationId, 36, 36);
   if (!/^[0-9a-f-]{36}$/i.test(agentId)) throw new AppError("Invalid creation request. Reopen the form and try again.");
   const name = textValue(input.name, 60), mission = textValue(input.mission, 3000, 12), model = textValue(input.model, 150);
+  if (input.avatar !== undefined && !isAgentAvatar(input.avatar)) throw new AppError("Choose one of the available agent avatars.");
+  const avatar = agentAvatarId(input.avatar);
   walletLimits(input, true);
   const existing = async () => {
     const agent = await one("SELECT * FROM agents WHERE id=? AND owner=?", agentId, owner);
     const session = await one("SELECT public_key,recipient,max_lamports,per_launch,max_launches FROM sessions WHERE agent_id=? AND owner=?", agentId, owner);
     if (!agent || !session) return null;
-    if (agent.name !== name || agent.mission !== mission || agent.model !== model)
+    const profile = await setting(owner, "public_agent_" + agentId);
+    if (agent.name !== name || agent.mission !== mission || agent.model !== model || agentAvatarId(profile?.avatar) !== avatar)
       throw new AppError("This creation request already belongs to another configuration.", 409);
-    return { id: agentId, publicKey: session.public_key };
+    return { id: agentId, publicKey: session.public_key, avatar };
   };
   const reused = await existing();
   if (reused) return reused;
@@ -57,7 +61,7 @@ export async function createAgentWallet(owner: string, input: any) {
         .bind(agentId, owner, name, mission, model, now()),
       wallet.statement,
       db().prepare("INSERT INTO settings(owner,key,value) VALUES (?,?,?)")
-        .bind(owner, "public_agent_" + agentId, JSON.stringify({ visible: true, createdAt: now() })),
+        .bind(owner, "public_agent_" + agentId, JSON.stringify({ visible: true, createdAt: now(), avatar })),
       db().prepare("INSERT INTO events (id,owner,agent_id,kind,message,created_at) VALUES (?,?,?,'created',?,?)")
         .bind(id(), owner, agentId, name + " and its dedicated wallet were created. Activation is off.", now()),
     ]);
@@ -66,7 +70,7 @@ export async function createAgentWallet(owner: string, input: any) {
     if (retried) return retried;
     throw error;
   }
-  return { id: agentId, publicKey: wallet.publicKey };
+  return { id: agentId, publicKey: wallet.publicKey, avatar };
 }
 
 export async function configureAgentWallet(owner: string, agentId: string, input: any) {

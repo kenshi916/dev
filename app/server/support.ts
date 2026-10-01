@@ -23,6 +23,7 @@ import { PUMP_AMM_SDK } from "@pump-fun/pump-swap-sdk";
 import { NATIVE_MINT, TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync, unpackAccount } from "@solana/spl-token";
 import bs58 from "bs58";
 import { simulatedDebit } from "./limits";
+import { verifiedDebit } from "./coin-accounting";
 import {
   AppError,
   change,
@@ -31,6 +32,7 @@ import {
   id,
   now,
   one,
+  publicLaunchTransaction,
   rpc,
   setting,
   setSetting,
@@ -293,6 +295,7 @@ export type PreparedFeeDistribution = {
   receivedSol?: string;
   feeLamports?: number;
   confirmedAt?: string;
+  verification?: "server-rpc" | "owner-rpc";
   actualRecipients?: { wallet: string; shareBps: number; receivedLamports: number }[];
 };
 
@@ -495,20 +498,34 @@ export async function confirmFeeDistribution(owner: string, draftId: string, sig
     throw new AppError("Prepare a fee collection for this coin first.", 404);
   if (prepared.signature && prepared.signature !== signature)
     throw new AppError("This collection is associated with a different transaction.", 409);
+  const isPublic = (await setting(owner, "public_agent_" + draft.agent_id))?.visible === true;
   const recordReceipt = async (record: PreparedFeeDistribution) => {
-    if (record.status !== "confirmed") return;
-    await change("INSERT INTO settings (owner,key,value) VALUES (?,?,?) ON CONFLICT(owner,key) DO NOTHING", owner,
-      "fee_receipt_" + signature, JSON.stringify({ signature, draftId, agentId: draft.agent_id,
-        treasury: record.treasury, receivedLamports: record.receivedLamports, confirmedAt: record.confirmedAt }));
+    if (!["confirmed", "failed"].includes(record.status)) return;
+    const creator = JSON.parse(draft.prepared || "{}").wallet;
+    let setupDebitLamports: number | null = null;
+    if (record.verification === "server-rpc") {
+      const setup = await setting(owner, "support_" + draftId);
+      if (setup?.signature && setup.transaction) {
+        try { setupDebitLamports = verifiedDebit(await publicLaunchTransaction(setup.signature, "base64"), setup.transaction, setup.signature, creator); }
+        catch { /* Incomplete cost history keeps net profit unverified. */ }
+      }
+    }
+    await change("INSERT INTO settings (owner,key,value) VALUES (?,?,?) ON CONFLICT(owner,key) DO UPDATE SET value=CASE WHEN json_extract(settings.value,'$.version') IS NULL OR json_extract(settings.value,'$.verification')!='server-rpc' THEN excluded.value ELSE json_set(settings.value,'$.setupDebitLamports',COALESCE(json_extract(settings.value,'$.setupDebitLamports'),json_extract(excluded.value,'$.setupDebitLamports'))) END WHERE json_extract(excluded.value,'$.verification')='server-rpc' AND json_extract(settings.value,'$.signature')=json_extract(excluded.value,'$.signature') AND json_extract(settings.value,'$.draftId')=json_extract(excluded.value,'$.draftId')", owner,
+      "fee_receipt_" + signature, JSON.stringify({ version: 2, signature, draftId, agentId: draft.agent_id, mint: record.mint,
+        status: record.status, verification: record.verification || "owner-rpc", creator, treasury: record.treasury, receivedLamports: record.status === "failed" ? 0 : record.receivedLamports,
+        creatorReceivedLamports: record.status === "failed" ? 0 : record.actualRecipients?.find(r => r.wallet === creator)?.receivedLamports ?? null,
+        creatorCollectionCostLamports: record.wallet === creator ? record.feeLamports ?? null : 0,
+        setupDebitLamports, recipients: record.actualRecipients, confirmedAt: record.confirmedAt }));
   };
-  if (prepared.status === "confirmed" || prepared.status === "failed") {
+  if (["confirmed", "failed"].includes(prepared.status) && (!isPublic || prepared.verification === "server-rpc")) {
     await recordReceipt(prepared);
     return prepared;
   }
-  const observed = await rpc(owner, "getTransaction", [signature, {
+  const observed = isPublic ? await publicLaunchTransaction(signature, "base64") : await rpc(owner, "getTransaction", [signature, {
     encoding: "base64", maxSupportedTransactionVersion: 0, commitment: "confirmed",
   }]);
   if (!observed) {
+    if (["confirmed", "failed"].includes(prepared.status)) return prepared;
     const finalizedHeight = checkedLamports(await rpc(owner, "getBlockHeight", [{ commitment: "finalized" }]), "finalized block height");
     if (finalizedHeight > prepared.lastValidBlockHeight) {
       const statuses = await rpc(owner, "getSignatureStatuses", [[signature], { searchTransactionHistory: true }]);
@@ -543,7 +560,7 @@ export async function confirmFeeDistribution(owner: string, draftId: string, sig
   if (!observed.meta || !("err" in observed.meta)) throw new AppError("The confirmed transaction has no accounting metadata.", 502);
   let completed: PreparedFeeDistribution;
   if (observed.meta.err !== null) {
-    completed = { ...prepared, status: "failed", signature };
+    completed = { ...prepared, status: "failed", signature, feeLamports: checkedLamports(observed.meta.fee, "confirmed transaction fee"), verification: isPublic ? "server-rpc" : "owner-rpc", confirmedAt: now() };
   } else {
     const feeLamports = checkedLamports(observed.meta.fee, "confirmed transaction fee");
     const before = observed.meta.preBalances;
@@ -561,7 +578,7 @@ export async function confirmFeeDistribution(owner: string, draftId: string, sig
     const receivedLamports = actualRecipients.find((r) => r.wallet === prepared.treasury)!.receivedLamports;
     completed = {
       ...prepared, status: "confirmed", signature, actualRecipients, receivedLamports,
-      receivedSol: (receivedLamports / 1e9).toFixed(9), feeLamports, confirmedAt: now(),
+      receivedSol: (receivedLamports / 1e9).toFixed(9), feeLamports, confirmedAt: now(), verification: isPublic ? "server-rpc" : "owner-rpc",
     };
   }
   const updated = await change("UPDATE settings SET value=? WHERE owner=? AND key=? AND value=?", JSON.stringify(completed), owner, key, JSON.stringify(prepared));

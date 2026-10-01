@@ -19,6 +19,7 @@ import {
   userId,
 } from "../../server/core";
 import { PublicKey } from "@solana/web3.js";
+import { agentAvatarId } from "../../agent-avatars";
 import { aiAccessStatus } from "../../server/ai-access";
 import {
   normalizeTwitterToken,
@@ -85,7 +86,7 @@ export async function GET() {
       support,
     ] = await Promise.all([
       rows(
-        "SELECT * FROM agents WHERE owner=? ORDER BY updated_at DESC",
+        "SELECT a.*,json_extract(p.value,'$.avatar') AS avatar FROM agents a LEFT JOIN settings p ON p.owner=a.owner AND p.key='public_agent_'||a.id WHERE a.owner=? ORDER BY a.updated_at DESC",
         owner,
       ),
       rows(
@@ -110,7 +111,7 @@ export async function GET() {
     ]);
     return Response.json(
       {
-        agents,
+        agents: agents.map(a => ({ ...a, avatar: agentAvatarId(a.avatar) })),
         events,
         drafts,
         tracks: tracks.filter((t) => t.kind === "tweet"),

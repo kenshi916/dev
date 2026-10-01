@@ -254,12 +254,12 @@ export async function rpc(owner: string, method: string, params: any[]) {
   return d.result;
 }
 // Public network claims must not rely on a viewer's configurable RPC endpoint.
-export async function publicLaunchTransaction(signature: string) {
+export async function publicLaunchTransaction(signature: string, encoding: "jsonParsed" | "base64" = "jsonParsed") {
   const url = (env as any).DEV_PUBLIC_SOLANA_RPC || "https://api.mainnet-beta.solana.com";
   const r = await external(httpsPublic(url), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getTransaction", params: [signature,
-      { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" }] }),
+      { encoding, maxSupportedTransactionVersion: 0, commitment: "confirmed" }] }),
   }, "Public Solana verification");
   const data: any = await r.json();
   if (data.error) throw new AppError("Public launch verification is unavailable. The coin remains unconfirmed in Activity.", 502);

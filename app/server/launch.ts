@@ -8,6 +8,7 @@ import {
 } from "@solana/web3.js";
 import { PUMP_SDK } from "@pump-fun/pump-sdk";
 import { simulatedDebit } from "./limits";
+import { verifiedDebit } from "./coin-accounting";
 import {
   AppError,
   change,
@@ -236,10 +237,17 @@ export async function confirmLaunch(owner: string, draftId: string) {
       "This transaction does not match the prepared coin launch.",
     );
   const confirmedAt = Number.isFinite(tx.blockTime) ? new Date(tx.blockTime * 1000).toISOString() : now();
+  let launchDebitLamports: number | null = null;
+  if (isPublic) {
+    try { launchDebitLamports = verifiedDebit(await publicLaunchTransaction(d.signature, "base64"), prepared.transaction, d.signature, prepared.wallet); }
+    catch { /* A verified launch may have unavailable cost accounting; never substitute simulation estimates. */ }
+  }
   await db().batch([
     db().prepare("UPDATE drafts SET status='launched' WHERE id=? AND owner=?").bind(draftId, owner),
-    db().prepare("INSERT INTO settings(owner,key,value) VALUES (?,?,?) ON CONFLICT(owner,key) DO NOTHING")
-      .bind(owner, "public_launch_" + draftId, JSON.stringify({ confirmedAt })),
+    db().prepare("INSERT INTO settings(owner,key,value) VALUES (?,?,?) ON CONFLICT(owner,key) DO UPDATE SET value=CASE WHEN json_extract(settings.value,'$.version') IS NULL THEN excluded.value ELSE json_set(settings.value,'$.launchDebitLamports',COALESCE(json_extract(settings.value,'$.launchDebitLamports'),json_extract(excluded.value,'$.launchDebitLamports'))) END WHERE json_extract(excluded.value,'$.verification')='server-rpc' AND COALESCE(json_extract(settings.value,'$.signature'),json_extract(excluded.value,'$.signature'))=json_extract(excluded.value,'$.signature') AND COALESCE(json_extract(settings.value,'$.mint'),json_extract(excluded.value,'$.mint'))=json_extract(excluded.value,'$.mint')")
+      .bind(owner, "public_launch_" + draftId, JSON.stringify({ version: 2, confirmedAt, verification: isPublic ? "server-rpc" : "owner-rpc",
+        signature: d.signature, mint: d.mint, creator: prepared.wallet, launchDebitLamports,
+        name: d.name, symbol: d.symbol, imageUrl: d.image_url || null })),
   ]);
   if (d.status !== "launched") {
     await event(

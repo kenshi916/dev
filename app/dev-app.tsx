@@ -2,6 +2,9 @@
 import DeployStudio from "./deploy-studio";
 import HomepageStory from "./homepage-story";
 import ModelAvatar from "./model-avatar";
+import AgentAvatar from "./agent-avatar";
+import AvatarPicker from "./avatar-picker";
+import type { AgentAvatarId } from "./agent-avatars";
 import TwitterStatus, {
   twitterLabel,
   type TwitterStatusData,
@@ -41,6 +44,7 @@ type Agent = {
   mission: string;
   model: string;
   status: string;
+  avatar?: string;
 };
 type Event = {
   id: string;
@@ -160,6 +164,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
     [name, setName] = useState(""),
     [mission, setMission] = useState(""),
     [model, setModel] = useState(""),
+    [avatar, setAvatar] = useState<AgentAvatarId>("byte"),
     [models, setModels] = useState<
       { id: string; name: string; created?: number }[]
     >([]),
@@ -366,7 +371,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
     creationId.current ||= crypto.randomUUID();
     const result = await act(
       "create_agent_wallet",
-      { name, mission, model, creationId: creationId.current },
+      { name, mission, model, avatar, creationId: creationId.current },
       "Your agent and its wallet are created. Fund and activate it next.",
     );
     if (result) {
@@ -699,6 +704,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
         <h2>Create your agent</h2>
         <span className="badge green">MODEL + WALLET</span>
       </div>
+      <AvatarPicker value={avatar} onChange={setAvatar} disabled={!!busy} />
       <label className="field">
         <span>Agent name</span>
         <input
@@ -771,7 +777,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
       <div className="agent-create-wallet">
         <div className="row between"><h3>We create its wallet.</h3><Wallet size={18} /></div>
         <p className="smalltext muted">Your agent gets its own Solana wallet automatically. Its deposit address appears next. Fund it with SOL, then set its limits and activate it.</p>
-        <p className="tiny muted">No existing wallet connection needed. Your agent’s name, model, public wallet, confirmed launches and source-backed launch thesis appear publicly. Missions and private execution logs stay in your workspace.</p>
+        <p className="tiny muted">No existing wallet connection needed. Your agent’s name, character, model, public wallet, confirmed launches and source-backed launch thesis appear publicly. Missions and private execution logs stay in your workspace.</p>
       </div>
       <div className="launch-bottom">
         <span className="muted">
@@ -947,7 +953,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                       }}
                     >
                       <div className="agent-icon">
-                        <ModelAvatar model={a.model} name={a.name} size={30} />
+                        <AgentAvatar avatar={a.avatar} name={a.name} size={54} animate={a.status === "running"} />
                       </div>
                       <div>
                         <h3>{a.name}</h3>
@@ -1031,6 +1037,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
           <section className="section">
             <div className="sectionhead">
               <div>
+                {selected && <AgentAvatar avatar={selected.avatar} name={selected.name} size={96} animate={selected.status === "running"} />}
                 <div className="eyebrow">Your workspace</div>
                 <h2 style={{ marginTop: 10 }}>
                   {selected ? selected.name : "Your coin developers"}
@@ -1064,7 +1071,7 @@ export default function DevApp({ user }: { user: { name: string } | null }) {
                       onClick={() => { setActive(a.id); setTab("Wallet & launch"); }}
                     >
                       <div className="agent-icon">
-                        <ModelAvatar model={a.model} name={a.name} size={30} />
+                        <AgentAvatar avatar={a.avatar} name={a.name} size={54} animate={a.status === "running"} />
                       </div>
                       <div>
                         <h3>{a.name}</h3>

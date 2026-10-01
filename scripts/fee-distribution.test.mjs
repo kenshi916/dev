@@ -13,11 +13,15 @@ const solana = require("@solana/web3.js");
 const spl = require("@solana/spl-token");
 const bs58 = require("bs58").default;
 const BN = require("bn.js");
-const { Keypair, PublicKey, VersionedTransaction, SystemProgram } = solana;
+const { Keypair, PublicKey, TransactionMessage, VersionedTransaction, SystemProgram } = solana;
 const { PUMP_SDK } = pump;
 const source = ts.transpileModule(readFileSync(new URL("../app/server/support.ts", import.meta.url), "utf8"), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
 }).outputText;
+const accountingModule = { exports: {} };
+vm.runInNewContext(ts.transpileModule(readFileSync(new URL("../app/server/coin-accounting.ts", import.meta.url), "utf8"), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+}).outputText, { module: accountingModule, exports: accountingModule.exports, require, Buffer });
 const rent = 890880;
 const tokenRent = 2039280;
 
@@ -27,12 +31,13 @@ async function harness(t, options = {}) {
   db.exec("CREATE TABLE settings(owner TEXT,key TEXT,value TEXT,PRIMARY KEY(owner,key)); CREATE TABLE drafts(id TEXT,owner TEXT,status TEXT,mint TEXT,prepared TEXT,agent_id TEXT); CREATE TABLE sessions(owner TEXT,agent_id TEXT,public_key TEXT);");
   const creator = Keypair.generate();
   const treasury = Keypair.generate();
-  const payer = options.treasuryPayer ? treasury : Keypair.generate();
+  const payer = options.creatorPayer ? creator : options.treasuryPayer ? treasury : Keypair.generate();
   const mint = Keypair.generate().publicKey;
   const sharing = pump.feeSharingConfigPda(mint);
   const ammAuthority = pump.ammCreatorVaultPda(sharing);
-  const blockhash = Keypair.generate().publicKey.toBase58();
   const calls = [];
+  const trustedCalls = [];
+  const trustedTransactions = new Map();
   const events = [];
   const accounts = new Map();
   const put = (key, owner, data, lamports = rent) => accounts.set(key.toBase58(), {
@@ -73,6 +78,7 @@ async function harness(t, options = {}) {
   db.prepare("INSERT INTO settings VALUES (?,?,?)").run("owner", "support", JSON.stringify({ treasury: treasury.publicKey.toBase58(), percentage: 20, mint: "" }));
   const set = (key, value) => db.prepare("INSERT INTO settings VALUES ('owner',?,?) ON CONFLICT(owner,key) DO UPDATE SET value=excluded.value").run(key, JSON.stringify(value));
   const get = (key) => { const row = db.prepare("SELECT value FROM settings WHERE owner='owner' AND key=?").get(key); return row ? JSON.parse(row.value) : null; };
+  if (options.publicAgent) set("public_agent_agent", { visible: true });
   let observed = null;
   class AppError extends Error { constructor(message, status = 400) { super(message); this.status = status; } }
   const core = {
@@ -83,13 +89,17 @@ async function harness(t, options = {}) {
     setSetting: async (owner, key, value) => db.prepare("INSERT INTO settings VALUES (?,?,?) ON CONFLICT(owner,key) DO UPDATE SET value=excluded.value").run(owner, key, JSON.stringify(value)),
     event: async (...args) => events.push(args),
     decrypt: async () => { throw new Error("Distribution must never decrypt a signing key"); },
+    publicLaunchTransaction: async (signature, encoding) => {
+      assert.equal(encoding, "base64"); trustedCalls.push(signature);
+      return trustedTransactions.get(signature) ?? null;
+    },
     rpc: async (owner, method, params) => {
       assert.equal(owner, "owner"); calls.push({ method, params });
       switch (method) {
         case "getMultipleAccounts": return { value: params[0].map((key) => accounts.get(key) ?? null) };
         case "getAccountInfo": return { value: accounts.get(params[0]) ?? null };
         case "getMinimumBalanceForRentExemption": return rent;
-        case "getLatestBlockhash": return { value: { blockhash, lastValidBlockHeight: 500 } };
+        case "getLatestBlockhash": return { value: { blockhash: Keypair.generate().publicKey.toBase58(), lastValidBlockHeight: 500 } };
         case "getBlockHeight": return options.expired ? 600 : 400;
         case "getSignatureStatuses": return { value: [null] };
         case "getFeeForMessage": return { value: 5000 };
@@ -100,7 +110,7 @@ async function harness(t, options = {}) {
     },
   };
   const evaluatedModule = { exports: {} };
-  const deps = { "./core": core, "./limits": { simulatedDebit: (s) => s.preBalances[0] - s.postBalances[0] }, "@pump-fun/pump-sdk": pump, "@pump-fun/pump-swap-sdk": swap, "@solana/web3.js": solana, "@solana/spl-token": spl, bs58: require("bs58") };
+  const deps = { "./coin-accounting": accountingModule.exports, "./core": core, "./limits": { simulatedDebit: (s) => s.preBalances[0] - s.postBalances[0] }, "@pump-fun/pump-sdk": pump, "@pump-fun/pump-swap-sdk": swap, "@solana/web3.js": solana, "@solana/spl-token": spl, bs58: require("bs58") };
   vm.runInNewContext(source, {
     module: evaluatedModule, exports: evaluatedModule.exports, require: (name) => { assert(name in deps, "Unexpected import " + name); return deps[name]; },
     Buffer, Uint8Array, crypto: globalThis.crypto, BigInt, Date, console,
@@ -119,9 +129,11 @@ async function harness(t, options = {}) {
       }
     }
     observed = { transaction: [Buffer.from(tx.serialize()).toString("base64"), "base64"], meta: { err: failed ? { InstructionError: [1, "fixture"] } : null, fee: 5000, preBalances: before, postBalances: after } };
-    return bs58.encode(tx.signatures[0]);
+    const signature = bs58.encode(tx.signatures[0]);
+    trustedTransactions.set(signature, observed);
+    return signature;
   }
-  return { api: evaluatedModule.exports, creator, treasury, payer, mint, sharing, accounts, calls, events, get, set, transactionResult };
+  return { api: evaluatedModule.exports, creator, treasury, payer, mint, sharing, accounts, calls, trustedCalls, trustedTransactions, events, get, set, transactionResult };
 }
 
 test("builds an unsigned SOL distribution from real SDK accounts without requiring a main coin", async (t) => {
@@ -234,6 +246,84 @@ test("pending and chain-failed transactions never report a collected amount", as
   h.transactionResult(prepared, { failed: true });
   const failed = await h.api.confirmFeeDistribution("owner", "draft", signature);
   assert.equal(failed.status, "failed"); assert.equal(failed.receivedLamports, undefined);
+});
+
+test("public failed creator-paid collections retain their verified cost after a later successful collection", async (t) => {
+  const h = await harness(t, { publicAgent: true, creatorPayer: true });
+  const prepared = await h.api.prepareFeeDistribution("owner", "draft", h.creator.publicKey.toBase58());
+  const failedSignature = h.transactionResult(prepared, { failed: true });
+  const failed = await h.api.confirmFeeDistribution("owner", "draft", failedSignature);
+  assert.equal(failed.status, "failed");
+  assert.equal(failed.verification, "server-rpc");
+  assert.equal(failed.feeLamports, 5000);
+  const failedReceipt = h.get("fee_receipt_" + failedSignature);
+  assert.equal(failedReceipt.status, "failed");
+  assert.equal(failedReceipt.verification, "server-rpc");
+  assert.equal(failedReceipt.creator, h.creator.publicKey.toBase58());
+  assert.equal(failedReceipt.creatorReceivedLamports, 0);
+  assert.equal(failedReceipt.receivedLamports, 0);
+  assert.equal(failedReceipt.creatorCollectionCostLamports, 5000);
+  assert.equal(failedReceipt.setupDebitLamports, null);
+
+  const next = await h.api.prepareFeeDistribution("owner", "draft", h.creator.publicKey.toBase58());
+  assert.notEqual(next.id, prepared.id);
+  const successSignature = h.transactionResult(next);
+  assert.notEqual(successSignature, failedSignature, "a new blockhash makes this a separate collection attempt");
+  const success = await h.api.confirmFeeDistribution("owner", "draft", successSignature);
+  assert.equal(success.status, "confirmed");
+  const successReceipt = h.get("fee_receipt_" + successSignature);
+  assert.equal(successReceipt.creatorReceivedLamports, 800000, "record the creator's actual share, not the treasury share");
+  assert.equal(successReceipt.receivedLamports, 200000);
+  assert.equal(successReceipt.creatorCollectionCostLamports, 5000);
+  assert.deepEqual(h.get("fee_receipt_" + failedSignature), failedReceipt, "success must not discard the earlier paid failure");
+  assert.deepEqual(h.trustedCalls, [failedSignature, successSignature]);
+  assert.equal(h.calls.filter((call) => call.method === "getTransaction").length, 0, "public receipts must not trust an owner-controlled RPC");
+  assert.equal(h.events.length, 2);
+});
+
+test("reconfirming a public receipt fills a missing setup debit once and preserves known costs", async (t) => {
+  const h = await harness(t, { publicAgent: true, creatorPayer: true });
+  // Offline fixture: the exact recorded setup message is signed locally solely
+  // to exercise signature/message verification. No transport can broadcast it.
+  const setupTx = new VersionedTransaction(new TransactionMessage({
+    payerKey: h.creator.publicKey,
+    recentBlockhash: Keypair.generate().publicKey.toBase58(),
+    instructions: [SystemProgram.transfer({ fromPubkey: h.creator.publicKey, toPubkey: h.treasury.publicKey, lamports: 1000000 })],
+  }).compileToV0Message());
+  const setupTransaction = Buffer.from(setupTx.serialize()).toString("base64");
+  setupTx.sign([h.creator]);
+  const setupSignature = bs58.encode(setupTx.signatures[0]);
+  const setupObserved = {
+    transaction: [Buffer.from(setupTx.serialize()).toString("base64"), "base64"],
+    meta: { err: null, fee: 5000, preBalances: [100000000, 100000000, 0], postBalances: [98995000, 101000000, 0] },
+  };
+  h.set("support_draft", { treasury: h.treasury.publicKey.toBase58(), transaction: setupTransaction, signature: setupSignature });
+  const prepared = await h.api.prepareFeeDistribution("owner", "draft", h.creator.publicKey.toBase58());
+  const signature = h.transactionResult(prepared);
+  await h.api.confirmFeeDistribution("owner", "draft", signature);
+  const initialReceipt = h.get("fee_receipt_" + signature);
+  assert.equal(initialReceipt.setupDebitLamports, null, "an unavailable trusted transaction must not be estimated");
+  assert.equal(initialReceipt.creatorCollectionCostLamports, 5000);
+
+  h.trustedTransactions.set(setupSignature, setupObserved);
+  await h.api.confirmFeeDistribution("owner", "draft", signature);
+  const verifiedReceipt = h.get("fee_receipt_" + signature);
+  assert.deepEqual(verifiedReceipt, { ...initialReceipt, setupDebitLamports: 1005000 });
+  assert.equal(h.events.length, 1, "backfilling accounting must not duplicate collection events");
+
+  h.trustedTransactions.delete(setupSignature);
+  await h.api.confirmFeeDistribution("owner", "draft", signature);
+  assert.deepEqual(h.get("fee_receipt_" + signature), verifiedReceipt, "a later RPC gap must not erase a verified debit");
+  h.trustedTransactions.set(setupSignature, {
+    ...setupObserved,
+    meta: { ...setupObserved.meta, postBalances: [97995000, 102000000, 0] },
+  });
+  await h.api.confirmFeeDistribution("owner", "draft", signature);
+  assert.deepEqual(h.get("fee_receipt_" + signature), verifiedReceipt, "reconfirmation must preserve the first verified debit and receipt amounts");
+  assert.equal(h.trustedCalls.filter((called) => called === signature).length, 1, "a confirmed collection itself is immutable");
+  assert.equal(h.trustedCalls.filter((called) => called === setupSignature).length, 4);
+  assert.equal(h.calls.filter((call) => call.method === "getTransaction").length, 0);
+  assert.equal(h.events.length, 1);
 });
 
 test("a dropped signature expires only after finalized block expiry and a history check", async (t) => {

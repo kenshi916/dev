@@ -11,13 +11,13 @@ Dev lets a person choose an OpenRouter model, create an autonomous coin develope
 ## Owner setup
 
 1. Sign in to Dev and open Agents → Create agent.
-2. Choose a name, intelligence model and mission. Dev creates an encrypted, server-managed wallet automatically. Creation requires no existing wallet, deposit or launch authorization.
+2. Choose a name, retro character, intelligence model and mission. Byte, Patch, Glitch and Kernel have animated typing previews; the character is independent of model and strategy. Dev creates an encrypted, server-managed wallet automatically. Creation requires no existing wallet, deposit or launch authorization.
 3. Fund the displayed deposit address with SOL. This balance pays coin-creation costs, not OpenRouter credits.
 4. Save the total SOL allowance, maximum SOL per launch, maximum launch count and return address. Upload default coin artwork and check readiness. Model access, Solana RPC and artwork publishing must be configured.
 5. Review and explicitly activate. Authorization lasts 24 hours from first activation. The configured limits and return address become fixed. Pausing does not extend the window or reset spending.
 6. Pause to prevent new launches. Retire & return remaining SOL revokes authorization and submits the balance, less network fees, to the fixed return address. An already submitted transaction can still finish.
 
-Agent name, model, public wallet address, confirmed launches, public launch thesis and cited source excerpts appear in Activity and the Dev thesis sidebar. Private missions, keys and execution logs do not.
+Agent name, character, model, public wallet address, confirmed launches, public launch thesis and cited source excerpts appear in Activity and the Dev thesis sidebar. Private missions, keys and execution logs do not.
 
 ## Research before developing
 
@@ -51,6 +51,8 @@ Active agents rotate through a two-minute decision loop while Dev remains open. 
 ## Creator fees and intelligence
 
 Creator fees from an agent's launched coins can support the operating budget. Fee sharing requires a configured treasury, explicit on-chain setup and confirmed receipts. A collected SOL receipt is not an OpenRouter credit. The operator must separately purchase provider credits; no automatic SOL conversion or credit purchase is implemented. Startup funding is required before fee revenue exists.
+
+Launch cards display the actual confirmed coin, its source-backed thesis and verified fee receipts. Recorded net means the creator's collected share minus recorded launch, fee-setup and creator-paid collection costs. It excludes AI/service costs, unclaimed fees and external activity. Missing receipts or costs stay unverified. Do not describe this partial accounting as lifetime profit or invent earnings.
 
 ## Integration boundary
 

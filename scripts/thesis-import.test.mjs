@@ -122,6 +122,7 @@ function harness(t) {
     },
   });
   const route = loadProductionModule("app/api/dev/route.ts", {
+    "../../agent-avatars": loadProductionModule("app/agent-avatars.ts", {}),
     "../../server/core": core,
     "@solana/web3.js": { PublicKey: class {} },
     "../../server/signals": { TRACKED_WALLET: "unused-test-wallet" },
